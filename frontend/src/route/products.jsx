@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import api from "../api/api";
+import { isAllowedName, isNonNegativeNumber } from "../utils/validation";
 import Header from "../components/Hader";
 import Footer from "../components/Footer";
 const API_BASE = api.defaults.baseURL || "";
@@ -20,7 +21,7 @@ function Products() {
   const [showCamera, setShowCamera]     = useState(false);
   const [cameraError, setCameraError]   = useState("");
   const [form, setForm] = useState({
-    product_name: "", cid: "", unit: "", price: ""
+    product_name: "", cid: "", unit: "" || 0, price: ""
   });
 
   const videoRef  = useRef(null);
@@ -184,8 +185,10 @@ function Products() {
 
   const handleSave = async () => {
     if (!form.product_name.trim()) { alert("Product name is required"); return; }
+    if (!isAllowedName(form.product_name)) { alert("Product name must contain letters and may include numbers/spaces, but cannot be only numbers or special symbols."); return; }
     if (!form.cid) { alert("Please select a category"); return; }
-    if (!form.price) { alert("Price is required"); return; }
+    if (!isNonNegativeNumber(form.price) || Number(form.price) <= 0) { alert("Price must be a positive number"); return; }
+    if (form.unit && !/^[A-Za-z0-9]+$/.test(form.unit)) { alert("Unit should contain letters and number only (e.g. 1kg, 10gm,3pcs)"); return; }
     try {
       setLoading(true);
       let pid;

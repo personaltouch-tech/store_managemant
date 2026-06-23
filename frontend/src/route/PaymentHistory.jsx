@@ -10,6 +10,10 @@ function PaymentHistory() {
   const [detail, setDetail] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  const handlePaybill = () => {
+    navigate(`/accounts?cid=${cid}`);
+  };
+
   useEffect(() => { loadDetail(); }, []);
 
   async function loadDetail() {
@@ -101,19 +105,34 @@ function PaymentHistory() {
           border: `1px solid ${c.currently_due_amount > 0 ? "#fecaca" : "#bbf7d0"}`,
           borderRadius: "10px", padding: "14px 18px",
           marginBottom: "24px", display: "flex",
-          justifyContent: "space-between", alignItems: "center"
+          justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px"
         }}>
-          <span style={{ fontWeight: "700", fontSize: "14px",
-            color: c.currently_due_amount > 0 ? "#dc2626" : "#15803d" }}>
-            {c.currently_due_amount > 0
-              ? `🔴 Balance Due: Rs ${parseFloat(c.currently_due_amount).toFixed(2)}`
-              : "✅ All dues cleared!"}
-          </span>
-          {c.last_paid_amount > 0 && (
-            <span style={{ fontSize: "13px", color: "#64748b" }}>
-              Last Paid: Rs {parseFloat(c.last_paid_amount).toFixed(2)}
+          <div>
+            <span style={{ fontWeight: "700", fontSize: "14px",
+              color: c.currently_due_amount > 0 ? "#dc2626" : "#15803d" }}>
+              {c.currently_due_amount > 0
+                ? `🔴 Balance Due: Rs ${parseFloat(c.currently_due_amount).toFixed(2)}`
+                : "✅ All dues cleared!"}
             </span>
-          )}
+            {c.last_paid_amount > 0 && (
+              <div style={{ fontSize: "13px", color: "#64748b", marginTop: "6px" }}>
+                Last Paid: Rs {parseFloat(c.last_paid_amount).toFixed(2)}
+              </div>
+            )}
+          </div>
+          <button
+            onClick={handlePaybill}
+            disabled={!(parseFloat(c.currently_due_amount || 0) > 0)}
+            style={{
+              backgroundColor: parseFloat(c.currently_due_amount || 0) > 0 ? "#dc2626" : "#e5e7eb",
+              color: parseFloat(c.currently_due_amount || 0) > 0 ? "white" : "#9ca3af",
+              border: "none", borderRadius: "8px",
+              padding: "10px 18px", cursor: parseFloat(c.currently_due_amount || 0) > 0 ? "pointer" : "not-allowed",
+              fontWeight: "700", fontSize: "13px"
+            }}
+          >
+            💰 Paybill
+          </button>
         </div>
 
         {/* Month Stacks */}

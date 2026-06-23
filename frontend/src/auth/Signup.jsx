@@ -1,5 +1,6 @@
 import { useState } from "react";
 import axios from "axios";
+import { isAllowedName, isValidEmail } from "../utils/validation";
 import { Link, useNavigate } from "react-router-dom";
 import "./auth.css";
 
@@ -12,6 +13,18 @@ function Signup() {
 
   const registerAdmin = async (e) => {
     e.preventDefault();
+    if (!isAllowedName(username)) {
+      alert("Username must contain letters and may include numbers/spaces, but cannot be only numbers or special symbols.");
+      return;
+    }
+    if (!isValidEmail(email)) {
+      alert("Please enter a valid email address");
+      return;
+    }
+    if (!password || password.length < 6) {
+      alert("Password must be at least 6 characters long");
+      return;
+    }
 
     try {
       setLoading(true);

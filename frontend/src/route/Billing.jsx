@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../api/api";
+import { isValidPhone } from "../utils/validation";
 import Header from "../components/Hader";
 import Footer from "../components/Footer";
 import "../style/billing.css";
@@ -67,7 +68,7 @@ function Billing() {
     setQuantities(prev => ({ ...prev, [pid]: Math.max(0, next) }));
 
   const canGenerate = selectedItems.length > 0 && !saving &&
-    paymentType === "Cash" && cashPhone.length >= 10;
+    paymentType === "Cash" && isValidPhone(cashPhone);
 
   const canAddToAccount = selectedItems.length > 0 && !saving &&
     paymentType === "Monthly Account" && !!selectedCustomer;

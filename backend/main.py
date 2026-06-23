@@ -11,6 +11,7 @@ from src.products.model import products
 from src.products.router import products_route
 from src.customer.router import customer_route
 from src.bill.router import bill_route
+from src.bill.model import bill, bill_items
 from fastapi.staticfiles import StaticFiles
 import os
 app = FastAPI()

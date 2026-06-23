@@ -213,7 +213,7 @@ function Dashboard() {
                         <td>
                           <button
                             className="eye-btn"
-                            onClick={() => viewCustomer(customer.cid)}
+                            onClick={() => navigate(`/accounts?cid=${customer.cid}`)}
                           >
                             Eye
                           </button>

@@ -5,7 +5,8 @@ from src.utils.db import get_db
 from src.utils.pdf import generate_bill_pdf
 from sqlalchemy.orm import Session
 from src.bill import controller
-
+from src.admin.model import admin
+from src.utils.helper import is_authenticated
 bill_route = APIRouter(prefix="/bill", tags=["bill"])
 
 @bill_route.post("/create_billItems", response_model=BillItemResponseSchema, status_code=status.HTTP_201_CREATED)

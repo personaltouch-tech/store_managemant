@@ -10,6 +10,7 @@ import Signup from "./auth/Signup";
 import Dashboard from "./route/Dashboard";
 import VerifyOtp from "./auth/VerifyOtp";
 import PaymentHistory from "./route/PaymentHistory";
+import AddCustomer from "./route/AddCustomer";
 
 function App() {
   return (
@@ -21,6 +22,7 @@ function App() {
         <Route path="Dashboard" element={<Dashboard />} />
         <Route path="/billing" element={<Billing />} />
         <Route path="/accounts" element={<Accounts />} />
+        <Route path="/AddCustomer" element={<AddCustomer />} />
         <Route path="/products" element={<Products />} />
         <Route path="/categories" element={<Categories />} />
         <Route path="/signup" element={<Signup />} />

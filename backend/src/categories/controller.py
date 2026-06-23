@@ -20,7 +20,7 @@ def create_category(body: createCategoriesSchema, db: Session):
     return {"message": "Category created successfully", "category_id": new_category.cid}
 
 def get_categories(db: Session):
-    categories_list = db.query(categories).all()
+    categories_list = db.query(categories).filter(categories.is_active == True).all()
     return categories_list
 
 def update_category(category_id: int, body: updateCategoriesSchema, db: Session):
@@ -39,7 +39,7 @@ def delete_category(category_id: int, db: Session):
     if not existing_category:
         raise HTTPException(404, detail="Category not found")
 
-    db.delete(existing_category)
+    existing_category.is_active = False
     db.commit()
 
     return existing_category

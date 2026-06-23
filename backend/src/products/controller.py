@@ -86,7 +86,7 @@ def delete_product(pid: int, db: Session):
     product = db.query(products).filter(products.pid == pid).first()
     if not product:
         raise HTTPException(404, detail="Product not found")
-    db.delete(product)
+    product.is_active = False
     db.commit()
     return product
 

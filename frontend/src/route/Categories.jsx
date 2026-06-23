@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import api from "../api/api";
+import { isAllowedName } from "../utils/validation";
 import Header from "../components/Hader";
 import Footer from "../components/Footer";
 function Categories() {
@@ -36,6 +37,10 @@ function Categories() {
   const handleSave = async () => {
     if (!form.cname.trim()) {
       alert("Category name is required");
+      return;
+    }
+    if (!isAllowedName(form.cname)) {
+      alert("Category name must contain letters and may include numbers/spaces, but cannot be only numbers or special symbols.");
       return;
     }
     try {

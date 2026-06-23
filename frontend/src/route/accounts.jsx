@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import api from "../api/api";
 import Header from "../components/Hader";
 import Footer from "../components/Footer";
 
 function Accounts() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [customers, setCustomers] = useState([]);
   const [search, setSearch] = useState("");
   const [selectedCid, setSelectedCid] = useState(null);
@@ -16,6 +17,13 @@ function Accounts() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => { loadCustomers(); }, []);
+
+  useEffect(() => {
+    const requestedCid = searchParams.get("cid");
+    if (requestedCid) {
+      openCustomer(Number(requestedCid));
+    }
+  }, [searchParams]);
 
   async function loadCustomers() {
     try {
@@ -240,7 +248,7 @@ function Accounts() {
           {[
             { label: "Customers", value: customers.length, plain: true },
             { label: "Total Due", value: `Rs ${totalDue.toFixed(2)}` },
-            { label: "Total Paid", value: `Rs ${totalPaid.toFixed(2)}` },
+            { label: "Last Paid", value: `Rs ${totalPaid.toFixed(2)}` },
           ].map((s, i) => (
             <div key={i} style={{
               backgroundColor: "white", borderRadius: "12px",
@@ -337,8 +345,15 @@ function Accounts() {
                       backgroundColor: "#1e3a5f", color: "white",
                       border: "none", borderRadius: "6px",
                       padding: "6px 14px", cursor: "pointer",
-                      fontSize: "12px", fontWeight: "700"
+                      fontSize: "12px", fontWeight: "700", marginRight: "8px"
                     }}>👁 View</button>
+                    <button onClick={() => openCustomer(c.cid)} disabled={!(c.currently_due_amount > 0)} style={{
+                      backgroundColor: c.currently_due_amount > 0 ? "#d97706" : "#e5e7eb",
+                      color: c.currently_due_amount > 0 ? "white" : "#9ca3af",
+                      border: "none", borderRadius: "6px",
+                      padding: "6px 14px", cursor: c.currently_due_amount > 0 ? "pointer" : "not-allowed",
+                      fontSize: "12px", fontWeight: "700"
+                    }}>💰 Paybill</button>
                   </td>
                 </tr>
               ))}

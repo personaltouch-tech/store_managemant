@@ -9,6 +9,7 @@ import Login from "./auth/Login";
 import Signup from "./auth/Signup";
 import Dashboard from "./route/Dashboard";
 import VerifyOtp from "./auth/VerifyOtp";
+import PaymentHistory from "./route/PaymentHistory";
 
 function App() {
   return (
@@ -24,6 +25,7 @@ function App() {
         <Route path="/categories" element={<Categories />} />
         <Route path="/signup" element={<Signup />} />
         <Route path="/verify-otp" element={<VerifyOtp />} />
+        <Route path="/PaymentHistory/:cid" element={<PaymentHistory />} />
 
       </Routes>
     </BrowserRouter>

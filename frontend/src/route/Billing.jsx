@@ -7,19 +7,19 @@ import "../style/billing.css";
 
 function Billing() {
   const navigate = useNavigate();
-  const [products, setProducts]             = useState([]);
-  const [categories, setCategories]         = useState([]);
-  const [customers, setCustomers]           = useState([]);
+  const [products, setProducts] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [customers, setCustomers] = useState([]);
   const [selectedCustomer, setSelectedCustomer] = useState("");
-  const [paymentType, setPaymentType]       = useState("Cash");
-  const [cashPhone, setCashPhone]           = useState("");
-  const [quantities, setQuantities]         = useState({});
+  const [paymentType, setPaymentType] = useState("Cash");
+  const [cashPhone, setCashPhone] = useState("");
+  const [quantities, setQuantities] = useState({});
   const [activeCategory, setActiveCategory] = useState(null);
-  const [searches, setSearches]             = useState({});
-  const [loading, setLoading]               = useState(true);
-  const [saving, setSaving]                 = useState(false);
-  const [notice, setNotice]                 = useState("");
-  const [billDone, setBillDone]             = useState(null);
+  const [searches, setSearches] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [notice, setNotice] = useState("");
+  const [billDone, setBillDone] = useState(null);
 
   useEffect(() => { loadData(); }, []);
 
@@ -177,83 +177,83 @@ function Billing() {
   };
 
   // ── WHATSAPP ──────────────────────────────────────────────
-const handleWhatsApp = async () => {
-  if (!billDone) return;
+  const handleWhatsApp = async () => {
+    if (!billDone) return;
 
-  const date = new Date(billDone.created_at).toLocaleDateString("en-IN", {
-    day: "2-digit", month: "short", year: "numeric"
-  });
+    const date = new Date(billDone.created_at).toLocaleDateString("en-IN", {
+      day: "2-digit", month: "short", year: "numeric"
+    });
 
-  let msg = ``;
-  msg += `🏪 *GANGADHAR PROVISION STORE*\n`;
-  msg += `━━━━━━━━━━━━━━━━━━━━━\n\n`;
-  msg += `📋 *BILL RECEIPT*\n`;
-  msg += `🔖 Bill No : *#${billDone.bid}*\n`;
-  msg += `📅 Date    : *${date}*\n`;
-  msg += `👤 Name    : *${billDone.cname}*\n`;
-  msg += `💳 Payment : *${billDone.paymentType}*\n\n`;
-  msg += `━━━━━━━━━━━━━━━━━━━━━\n`;
-  msg += `🛒 *ITEMS PURCHASED*\n`;
-  msg += `━━━━━━━━━━━━━━━━━━━━━\n`;
+    let msg = ``;
+    msg += `🏪 *GANGADHAR PROVISION STORE*\n`;
+    msg += `━━━━━━━━━━━━━━━━━━━━━\n\n`;
+    msg += `📋 *BILL RECEIPT*\n`;
+    msg += `🔖 Bill No : *#${billDone.bid}*\n`;
+    msg += `📅 Date    : *${date}*\n`;
+    msg += `👤 Name    : *${billDone.cname}*\n`;
+    msg += `💳 Payment : *${billDone.paymentType}*\n\n`;
+    msg += `━━━━━━━━━━━━━━━━━━━━━\n`;
+    msg += `🛒 *ITEMS PURCHASED*\n`;
+    msg += `━━━━━━━━━━━━━━━━━━━━━\n`;
 
-  billDone.items.forEach((item, index) => {
-    msg += `${index + 1}. ${item.product_name}\n`;
-    msg += `   ${item.quantity} x Rs.${Number(item.price).toFixed(2)} = *Rs.${item.subtotal.toFixed(2)}*\n`;
-  });
+    billDone.items.forEach((item, index) => {
+      msg += `${index + 1}. ${item.product_name}\n`;
+      msg += `   ${item.quantity} x Rs.${Number(item.price).toFixed(2)} = *Rs.${item.subtotal.toFixed(2)}*\n`;
+    });
 
-  msg += `━━━━━━━━━━━━━━━━━━━━━\n`;
-  msg += `💰 *TOTAL AMOUNT : Rs.${parseFloat(billDone.total_amount).toFixed(2)}*\n`;
-  msg += `━━━━━━━━━━━━━━━━━━━━━\n\n`;
+    msg += `━━━━━━━━━━━━━━━━━━━━━\n`;
+    msg += `💰 *TOTAL AMOUNT : Rs.${parseFloat(billDone.total_amount).toFixed(2)}*\n`;
+    msg += `━━━━━━━━━━━━━━━━━━━━━\n\n`;
 
-  if (billDone.paymentType === "Monthly Account") {
-    msg += `📌 _Added to your Monthly Account_\n\n`;
-  } else {
-    msg += `✅ _Payment Received — Thank You!_\n\n`;
-  }
+    if (billDone.paymentType === "Monthly Account") {
+      msg += `📌 _Added to your Monthly Account_\n\n`;
+    } else {
+      msg += `✅ _Payment Received — Thank You!_\n\n`;
+    }
 
-  msg += `🙏 *Thank you for shopping with us!*\n`;
-  msg += `📍 Gangadhar Provision Store\n`;
-  msg += `📞 Visit us again!`;
+    msg += `🙏 *Thank you for shopping with us!*\n`;
+    msg += `📍 Gangadhar Provision Store\n`;
+    msg += `📞 Visit us again!`;
 
-  const waUrl = billDone.phone
-    ? `https://wa.me/91${billDone.phone}?text=${encodeURIComponent(msg)}`
-    : `https://wa.me/?text=${encodeURIComponent(msg)}`;
-  window.open(waUrl, "_blank");
-};
+    const waUrl = billDone.phone
+      ? `https://wa.me/91${billDone.phone}?text=${encodeURIComponent(msg)}`
+      : `https://wa.me/?text=${encodeURIComponent(msg)}`;
+    window.open(waUrl, "_blank");
+  };
 
 
   const handleDownloadPDF = async () => {
-  if (!billDone) return;
-  try {
-    const res = await api.post("/bill/generate_pdf", {
-      bill_data: {
-        bid: billDone.bid,
-        cname: billDone.cname,
-        phone: billDone.phone || "",
-        total_amount: parseFloat(billDone.total_amount).toFixed(2),
-        payment_type: billDone.paymentType,
-        created_at: new Date(billDone.created_at).toLocaleDateString("en-IN"),
-      },
-      items: billDone.items.map(i => ({
-        product_name: i.product_name,
-        quantity: i.quantity,
-        unit_price: Number(i.price).toFixed(2),
-        subtotal: i.subtotal.toFixed(2),
-      }))
-    }, { responseType: "blob" });   // ← blob for binary PDF
+    if (!billDone) return;
+    try {
+      const res = await api.post("/bill/generate_pdf", {
+        bill_data: {
+          bid: billDone.bid,
+          cname: billDone.cname,
+          phone: billDone.phone || "",
+          total_amount: parseFloat(billDone.total_amount).toFixed(2),
+          payment_type: billDone.paymentType,
+          created_at: new Date(billDone.created_at).toLocaleDateString("en-IN"),
+        },
+        items: billDone.items.map(i => ({
+          product_name: i.product_name,
+          quantity: i.quantity,
+          unit_price: Number(i.price).toFixed(2),
+          subtotal: i.subtotal.toFixed(2),
+        }))
+      }, { responseType: "blob" });   // ← blob for binary PDF
 
-    const url = window.URL.createObjectURL(new Blob([res.data]));
-    const a   = document.createElement("a");
-    a.href    = url;
-    a.setAttribute("download", `Bill_${billDone.bid}.pdf`);
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    window.URL.revokeObjectURL(url);
-  } catch (err) {
-    alert("Failed to generate PDF: " + (err?.response?.data?.detail || err.message));
-  }
-};
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const a = document.createElement("a");
+      a.href = url;
+      a.setAttribute("download", `Bill_${billDone.bid}.pdf`);
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      alert("Failed to generate PDF: " + (err?.response?.data?.detail || err.message));
+    }
+  };
   const activeCat = categories.find(c => c.cid === activeCategory);
 
   // ── JSX ───────────────────────────────────────────────────
@@ -352,12 +352,12 @@ const handleWhatsApp = async () => {
                 >
                   <option value="">-- Select Customer --</option>
                   {customers
-  .filter(c => c.cname !== "Cash Customer")
-  .map(c => (
-    <option key={c.cid} value={c.cid}>
-      {c.cname} - {c.cphone}
-    </option>
-  ))}
+                    .filter(c => c.cname !== "Cash Customer")
+                    .map(c => (
+                      <option key={c.cid} value={c.cid}>
+                        {c.cname} - {c.cphone}
+                      </option>
+                    ))}
                 </select>
 
                 {/* ADD TO ACCOUNT BUTTON */}
@@ -441,8 +441,10 @@ const handleWhatsApp = async () => {
                     }}>
                       {cat.cname.charAt(0).toUpperCase()}
                     </div>
-                    <div style={{ fontSize: "12px", fontWeight: "700",
-                      color: "#1e293b" }}>{cat.cname}</div>
+                    <div style={{
+                      fontSize: "12px", fontWeight: "700",
+                      color: "#1e293b"
+                    }}>{cat.cname}</div>
                     <div style={{ fontSize: "10px", color: "#64748b" }}>
                       {getProductsByCategory(cat.cid).length} items
                     </div>
@@ -471,8 +473,10 @@ const handleWhatsApp = async () => {
                   backgroundColor: "#1e3a5f"
                 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                    <span style={{ fontSize: "14px", fontWeight: "700",
-                      color: "white" }}>{activeCat.cname}</span>
+                    <span style={{
+                      fontSize: "14px", fontWeight: "700",
+                      color: "white"
+                    }}>{activeCat.cname}</span>
                     <span style={{
                       fontSize: "11px", color: "#93c5fd",
                       backgroundColor: "rgba(255,255,255,0.15)",
@@ -510,26 +514,26 @@ const handleWhatsApp = async () => {
                           key={product.pid}
                         >
                           <div className="billing-product-image">
-  {product.image_url ? (
-    <img
-      src={`${api.defaults.baseURL}${product.image_url}`}
-      alt={product.product_name}
-      style={{ width: "100%", height: "100%", objectFit: "cover" }}
-      onError={(e) => {
-        e.target.style.display = "none";
-        e.target.nextSibling.style.display = "flex";
-      }}
-    />
-  ) : null}
-  <span style={{
-    display: product.image_url ? "none" : "flex",
-    width: "100%", height: "100%",
-    alignItems: "center", justifyContent: "center",
-    fontSize: "28px", fontWeight: "800", color: "#0369a1"
-  }}>
-    {product.product_name.charAt(0).toUpperCase()}
-  </span>
-</div>
+                            {product.image_url ? (
+                              <img
+                                src={`${api.defaults.baseURL}${product.image_url}`}
+                                alt={product.product_name}
+                                style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                                onError={(e) => {
+                                  e.target.style.display = "none";
+                                  e.target.nextSibling.style.display = "flex";
+                                }}
+                              />
+                            ) : null}
+                            <span style={{
+                              display: product.image_url ? "none" : "flex",
+                              width: "100%", height: "100%",
+                              alignItems: "center", justifyContent: "center",
+                              fontSize: "28px", fontWeight: "800", color: "#0369a1"
+                            }}>
+                              {product.product_name.charAt(0).toUpperCase()}
+                            </span>
+                          </div>
                           <div className="billing-product-body">
                             <h3>{product.product_name}</h3>
                             <p>{product.unit || ""}</p>
@@ -568,13 +572,17 @@ const handleWhatsApp = async () => {
             boxShadow: "0 10px 40px rgba(0,0,0,0.2)",
             maxHeight: "90vh", overflowY: "auto"
           }}>
-            <div style={{ fontSize: "16px", fontWeight: "700",
-              color: "#15803d", textAlign: "center", marginBottom: "4px" }}>
+            <div style={{
+              fontSize: "16px", fontWeight: "700",
+              color: "#15803d", textAlign: "center", marginBottom: "4px"
+            }}>
               ✓ {billDone.paymentType === "Monthly Account"
                 ? "Added to Monthly Account!" : "Bill Generated Successfully!"}
             </div>
-            <div style={{ fontSize: "13px", color: "#64748b",
-              textAlign: "center", marginBottom: "16px" }}>
+            <div style={{
+              fontSize: "13px", color: "#64748b",
+              textAlign: "center", marginBottom: "16px"
+            }}>
               Bill #{billDone.bid}
             </div>
 
@@ -583,15 +591,19 @@ const handleWhatsApp = async () => {
               backgroundColor: "#f8fafc", borderRadius: "8px",
               padding: "12px", marginBottom: "12px"
             }}>
-              <div style={{ display: "flex", justifyContent: "space-between",
+              <div style={{
+                display: "flex", justifyContent: "space-between",
                 fontSize: "13px", paddingBottom: "6px",
-                marginBottom: "6px", borderBottom: "1px solid #e2e8f0" }}>
+                marginBottom: "6px", borderBottom: "1px solid #e2e8f0"
+              }}>
                 <span>Customer</span>
                 <span style={{ fontWeight: "700" }}>{billDone.cname}</span>
               </div>
-              <div style={{ display: "flex", justifyContent: "space-between",
+              <div style={{
+                display: "flex", justifyContent: "space-between",
                 fontSize: "13px", paddingBottom: "6px",
-                marginBottom: "6px", borderBottom: "1px solid #e2e8f0" }}>
+                marginBottom: "6px", borderBottom: "1px solid #e2e8f0"
+              }}>
                 <span>Payment</span>
                 <span style={{
                   fontWeight: "700",
@@ -601,8 +613,10 @@ const handleWhatsApp = async () => {
                   {billDone.paymentType}
                 </span>
               </div>
-              <div style={{ display: "flex", justifyContent: "space-between",
-                fontSize: "13px" }}>
+              <div style={{
+                display: "flex", justifyContent: "space-between",
+                fontSize: "13px"
+              }}>
                 <span>Phone</span>
                 <span>{billDone.phone || "—"}</span>
               </div>
@@ -652,7 +666,7 @@ const handleWhatsApp = async () => {
                 color: "white", border: "none", borderRadius: "8px",
                 cursor: "pointer", fontSize: "13px", fontWeight: "700"
               }}>📱 WhatsApp</button>
-              
+
               <button onClick={handleDownloadPDF} style={{
                 flex: 1, padding: "10px 0", backgroundColor: "#dc2626",
                 color: "white", border: "none", borderRadius: "8px",
@@ -661,7 +675,7 @@ const handleWhatsApp = async () => {
             </div>
 
             <button
-onClick={() => setBillDone(null)}
+              onClick={() => setBillDone(null)}
 
               style={{
                 width: "100%", padding: "11px 0",

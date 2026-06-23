@@ -12,6 +12,10 @@ from src.products.router import products_route
 from src.customer.router import customer_route
 from src.bill.router import bill_route
 from fastapi.staticfiles import StaticFiles
+from src.history.model import payment_history
+from src.history.router import history_route
+from fastapi.middleware.cors import CORSMiddleware
+
 import os
 app = FastAPI()
 
@@ -30,6 +34,8 @@ app.include_router(categories_route)
 app.include_router(products_route)
 app.include_router(customer_route)
 app.include_router(bill_route)
+app.include_router(history_route)
+
 
 @app.get("/")
 def home():

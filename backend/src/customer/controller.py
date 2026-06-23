@@ -101,11 +101,13 @@ def pay_customer(cid: int, amount: float, db: Session):
     }
     
 def delete_month_bills(cid: int, month_key: str, db: Session):
-    # month_key format: "2026-06"
     year, month = month_key.split("-")
     from sqlalchemy import extract
-    
-    # get all monthly account bills for this customer in this month
+    from src.history.controller import save_month_to_history
+
+    # ── SAVE TO HISTORY FIRST ─────────────────────────────────
+    save_month_to_history(cid, month_key, db)
+
     month_bills = db.query(bill).filter(
         bill.cid == cid,
         bill.payment_type == "Monthly Account",
@@ -117,9 +119,7 @@ def delete_month_bills(cid: int, month_key: str, db: Session):
         raise HTTPException(404, detail="No bills found for this month")
 
     for b in month_bills:
-        # delete bill items first
         db.query(bill_items).filter(bill_items.bid == b.bid).delete()
-        # reduce due amount
         cust = db.query(customer).filter(customer.cid == cid).first()
         if cust:
             cust.currently_due_amount = max(
@@ -128,4 +128,4 @@ def delete_month_bills(cid: int, month_key: str, db: Session):
         db.delete(b)
 
     db.commit()
-    return {"message": "Month bills deleted successfully"}    
+    return {"message": "Month bills saved to history and deleted successfully"}

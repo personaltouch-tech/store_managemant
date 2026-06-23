@@ -22,29 +22,53 @@ def serialize_product(p: products) -> dict:
 
 
 def create_product(body: createProductSchema, db: Session):
-    # Check category exists
-    cat = db.query(categories).filter(categories.cid == body.cid).first()
-    if not cat:
-        raise HTTPException(404, detail="Category not found")
+    # Check category exists — remove is_active check
+    cat = db.query(categories).filter(
+        categories.cid == body.cid
+    ).first()
 
-    # Check duplicate product name in same category
+    if not cat:
+        raise HTTPException(status_code=404, detail="Category not found")
+
+    # Check existing product
     existing = db.query(products).filter(
         products.product_name == body.product_name,
         products.cid == body.cid
     ).first()
-    if existing:
-        raise HTTPException(400, detail="Product already exists in this category")
 
+    if existing:
+        if existing.is_active == False:
+            # Reactivate
+            existing.is_active = True
+            existing.unit  = body.unit
+            existing.price = body.price
+            db.commit()
+            db.refresh(existing)
+            return {
+                "message": "Product reactivated successfully",
+                "product_id": existing.pid
+            }
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail="Product already exists in this category"
+            )
+
+    # Create new
     new_product = products(
         product_name=body.product_name,
         cid=body.cid,
         unit=body.unit,
-        price=body.price
+        price=body.price,
+        is_active=True
     )
     db.add(new_product)
     db.commit()
     db.refresh(new_product)
-    return {"message": "Product created successfully", "product_id": new_product.pid}
+    return {
+        "message": "Product created successfully",
+        "product_id": new_product.pid
+    }
 
 
 def get_all_products(db: Session):
@@ -86,7 +110,7 @@ def delete_product(pid: int, db: Session):
     product = db.query(products).filter(products.pid == pid).first()
     if not product:
         raise HTTPException(404, detail="Product not found")
-    db.delete(product)
+    product.is_active = False
     db.commit()
     return product
 

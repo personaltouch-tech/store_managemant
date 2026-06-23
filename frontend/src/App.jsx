@@ -25,7 +25,9 @@ function App() {
         <Route path="/categories" element={<Categories />} />
         <Route path="/signup" element={<Signup />} />
         <Route path="/verify-otp" element={<VerifyOtp />} />
-        <Route path="/PaymentHistory/:cid" element={<PaymentHistory />} />
+        <Route path="/PaymentHistory" element={<PaymentHistory />} />
+
+        
 
       </Routes>
     </BrowserRouter>

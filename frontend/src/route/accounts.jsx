@@ -15,13 +15,17 @@ function Accounts() {
   const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(true);
 
+  // ── MISSING STATES (now fixed) ─────────────────────────────
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [newCustomer, setNewCustomer] = useState({ cname: "", cphone: "", cmail: "" });
+  const [addLoading, setAddLoading] = useState(false);
+
   useEffect(() => { loadCustomers(); }, []);
 
   async function loadCustomers() {
     try {
       setLoading(true);
       const res = await api.get("/customer/get_all_customer");
-      // filter out Cash Customers
       setCustomers((res.data || []).filter(c => c.cname !== "Cash Customer"));
     } catch {
       setNotice("Failed to load customers");
@@ -50,7 +54,7 @@ function Accounts() {
     setPayLoading(true);
     try {
       await api.post(`/customer/pay_customer/${selectedCid}`, { amount });
-      await openCustomer(selectedCid); // refresh
+      await openCustomer(selectedCid);
       await loadCustomers();
       setPayAmount("");
       setNotice("✅ Payment recorded successfully!");
@@ -120,8 +124,44 @@ function Accounts() {
     }
   };
 
-
   // ── MONTHLY STATEMENT WHATSAPP ────────────────────────────
+  const handleMonthlyWhatsApp = (key, monthData) => {
+    const c = customerDetail.Customer;
+    const { label, bills, total } = monthData;
+
+    let msg = `🏪 *GANGADHAR PROVISION STORE*\n`;
+    msg += `━━━━━━━━━━━━━━━━━━━━━\n`;
+    msg += `📊 *${label} Statement*\n`;
+    msg += `👤 ${c.cname}  |  📞 ${c.cphone}\n`;
+    msg += `━━━━━━━━━━━━━━━━━━━━━\n\n`;
+
+    bills.forEach((bill, idx) => {
+      const billItems = customerDetail.BillItems.filter(i => i.bid === bill.bid);
+      const date = new Date(bill.created_at).toLocaleDateString("en-IN", {
+        day: "2-digit", month: "short"
+      });
+      msg += `${idx + 1}. Bill #${bill.bid} — ${date}\n`;
+      billItems.forEach(item => {
+        msg += `   • ${item.product_name} x${item.quantity} = Rs.${item.subtotal.toFixed(2)}\n`;
+      });
+      msg += `   💰 Rs.${bill.total_amount.toFixed(2)}\n\n`;
+    });
+
+    msg += `━━━━━━━━━━━━━━━━━━━━━\n`;
+    msg += `📦 Bills      : ${bills.length}\n`;
+    msg += `💰 Month Total: *Rs.${total.toFixed(2)}*\n`;
+    msg += `🔴 Total Due  : *Rs.${c.currently_due_amount.toFixed(2)}*\n`;
+    msg += `━━━━━━━━━━━━━━━━━━━━━\n`;
+    msg += `🙏 Please clear dues.\n`;
+    msg += `📍 Gangadhar Provision Store`;
+
+    const url = c.cphone
+      ? `https://wa.me/91${c.cphone}?text=${encodeURIComponent(msg)}`
+      : `https://wa.me/?text=${encodeURIComponent(msg)}`;
+    window.open(url, "_blank");
+  };
+
+  // ── MONTHLY PDF ───────────────────────────────────────────
   const handleMonthlyPDF = async (key, monthData) => {
     const c = customerDetail.Customer;
     const { label, bills, total } = monthData;
@@ -185,9 +225,7 @@ function Accounts() {
     if (!confirm1) return;
 
     try {
-      await api.post(`/customer/delete_month_bills/${selectedCid}`, {
-        month_key: key
-      });
+      await api.post(`/customer/delete_month_bills/${selectedCid}`, { month_key: key });
       await openCustomer(selectedCid);
       await loadCustomers();
       setNotice(`✅ ${label} bills deleted successfully.`);
@@ -195,6 +233,29 @@ function Accounts() {
       alert("Failed to delete: " + (err?.response?.data?.detail || err.message));
     }
   };
+
+  async function handleAddCustomer() {
+    if (!newCustomer.cname.trim()) return alert("Enter customer name");
+    if (newCustomer.cphone.length < 10) return alert("Enter valid 10 digit phone");
+
+    setAddLoading(true);
+    try {
+      await api.post("/customer/create_customer", {
+        cname: newCustomer.cname,
+        cphone: newCustomer.cphone,
+        cmail: newCustomer.cmail,
+        currently_due_amount: 0,
+        last_paid_amount: 0
+      });
+      await loadCustomers();
+      setShowAddForm(false);
+      setNewCustomer({ cname: "", cphone: "", cmail: "" });
+      setNotice("✅ Customer added successfully!");
+    } catch (err) {
+      alert(err?.response?.data?.detail || "Failed to add customer");
+    } finally { setAddLoading(false); }
+  }
+
   // ── STATS ─────────────────────────────────────────────────
   const totalDue = customers.reduce((s, c) => s + (c.currently_due_amount || 0), 0);
   const totalPaid = customers.reduce((s, c) => s + (c.last_paid_amount || 0), 0);
@@ -209,6 +270,75 @@ function Accounts() {
   return (
     <div style={{ minHeight: "100vh", backgroundColor: "#f1f5f9" }}>
       <Header />
+
+      {/* ── ADD CUSTOMER MODAL (moved to top level) ── */}
+      {showAddForm && (
+        <div style={{
+          position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.5)",
+          display: "flex", alignItems: "center",
+          justifyContent: "center", zIndex: 1000
+        }}>
+          <div style={{
+            backgroundColor: "white", borderRadius: "14px",
+            padding: "28px", width: "100%", maxWidth: "400px",
+            boxShadow: "0 10px 40px rgba(0,0,0,0.2)"
+          }}>
+            <h2 style={{ fontSize: "18px", fontWeight: "800",
+              color: "#1e3a5f", margin: "0 0 20px" }}>
+              + Add New Customer
+            </h2>
+
+            {[
+              { label: "Customer Name *", key: "cname", placeholder: "Full name", type: "text" },
+              { label: "Phone Number *", key: "cphone", placeholder: "10 digit number", type: "text", maxLength: 10 },
+              { label: "Email (optional)", key: "cmail", placeholder: "email@example.com", type: "email" },
+            ].map(f => (
+              <div key={f.key} style={{ marginBottom: "14px" }}>
+                <label style={{ fontSize: "12px", fontWeight: "700",
+                  color: "#64748b", display: "block", marginBottom: "4px" }}>
+                  {f.label}
+                </label>
+                <input
+                  type={f.type}
+                  placeholder={f.placeholder}
+                  maxLength={f.maxLength}
+                  value={newCustomer[f.key]}
+                  onChange={e => setNewCustomer(prev => ({
+                    ...prev,
+                    [f.key]: f.key === "cphone"
+                      ? e.target.value.replace(/\D/g, "")
+                      : e.target.value
+                  }))}
+                  style={{
+                    width: "100%", padding: "9px 12px",
+                    border: "1px solid #e2e8f0", borderRadius: "8px",
+                    fontSize: "14px", outline: "none", boxSizing: "border-box"
+                  }}
+                />
+              </div>
+            ))}
+
+            <div style={{ display: "flex", gap: "10px", marginTop: "20px" }}>
+              <button onClick={handleAddCustomer} disabled={addLoading} style={{
+                flex: 1, padding: "11px 0", backgroundColor: "#1e3a5f",
+                color: "white", border: "none", borderRadius: "8px",
+                cursor: "pointer", fontWeight: "700", fontSize: "14px"
+              }}>
+                {addLoading ? "Adding..." : "✓ Add Customer"}
+              </button>
+              <button onClick={() => {
+                setShowAddForm(false);
+                setNewCustomer({ cname: "", cphone: "", cmail: "" });
+              }} style={{
+                flex: 1, padding: "11px 0", backgroundColor: "#f1f5f9",
+                color: "#1e3a5f", border: "none", borderRadius: "8px",
+                cursor: "pointer", fontWeight: "700", fontSize: "14px"
+              }}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <main style={{ maxWidth: "1200px", margin: "0 auto", padding: "24px 16px" }}>
 
         {/* Top */}
@@ -217,15 +347,14 @@ function Accounts() {
           alignItems: "center", marginBottom: "24px"
         }}>
           <div>
-            <h1 style={{
-              fontSize: "24px", fontWeight: "800",
-              color: "#1e3a5f", margin: 0
-            }}>Accounts</h1>
+            <h1 style={{ fontSize: "24px", fontWeight: "800", color: "#1e3a5f", margin: 0 }}>
+              Accounts
+            </h1>
             <p style={{ color: "#64748b", margin: "4px 0 0" }}>
               Customer dues, payments, and bill history in one place.
             </p>
           </div>
-          <button onClick={() => navigate("/AddCustomer")} style={{
+          <button onClick={() => setShowAddForm(true)} style={{
             backgroundColor: "#1e3a5f", color: "white", border: "none",
             borderRadius: "8px", padding: "10px 20px",
             fontWeight: "700", fontSize: "14px", cursor: "pointer"
@@ -246,10 +375,9 @@ function Accounts() {
               backgroundColor: "white", borderRadius: "12px",
               padding: "20px", boxShadow: "0 1px 4px rgba(0,0,0,0.06)"
             }}>
-              <div style={{
-                fontSize: "13px", color: "#64748b",
-                marginBottom: "8px"
-              }}>{s.label}</div>
+              <div style={{ fontSize: "13px", color: "#64748b", marginBottom: "8px" }}>
+                {s.label}
+              </div>
               <div style={{
                 fontSize: s.plain ? "32px" : "22px",
                 fontWeight: "800", color: "#1e3a5f"
@@ -276,10 +404,9 @@ function Accounts() {
             display: "flex", justifyContent: "space-between",
             alignItems: "center", marginBottom: "16px"
           }}>
-            <h2 style={{
-              fontSize: "18px", fontWeight: "700",
-              color: "#1e3a5f", margin: 0
-            }}>Customer Accounts</h2>
+            <h2 style={{ fontSize: "18px", fontWeight: "700", color: "#1e3a5f", margin: 0 }}>
+              Customer Accounts
+            </h2>
             <input
               type="text"
               placeholder="Search name, phone, email"
@@ -308,28 +435,20 @@ function Accounts() {
             <tbody>
               {filtered.map(c => (
                 <tr key={c.cid} style={{ borderBottom: "1px solid #f8fafc" }}>
-                  <td style={{
-                    padding: "14px 12px", fontWeight: "700",
-                    color: "#1e293b"
-                  }}>{c.cname}</td>
-                  <td style={{
-                    padding: "14px 12px",
-                    color: "#475569"
-                  }}>{c.cphone}</td>
-                  <td style={{
-                    padding: "14px 12px",
-                    color: "#475569"
-                  }}>{c.cmail || "-"}</td>
+                  <td style={{ padding: "14px 12px", fontWeight: "700", color: "#1e293b" }}>
+                    {c.cname}
+                  </td>
+                  <td style={{ padding: "14px 12px", color: "#475569" }}>{c.cphone}</td>
+                  <td style={{ padding: "14px 12px", color: "#475569" }}>{c.cmail || "-"}</td>
                   <td style={{ padding: "14px 12px" }}>
                     <span style={{
                       color: c.currently_due_amount > 0 ? "#dc2626" : "#15803d",
                       fontWeight: "700"
-                    }}>Rs {parseFloat(c.currently_due_amount || 0).toFixed(2)}</span>
+                    }}>
+                      Rs {parseFloat(c.currently_due_amount || 0).toFixed(2)}
+                    </span>
                   </td>
-                  <td style={{
-                    padding: "14px 12px",
-                    color: "#475569"
-                  }}>
+                  <td style={{ padding: "14px 12px", color: "#475569" }}>
                     Rs {parseFloat(c.last_paid_amount || 0).toFixed(2)}
                   </td>
                   <td style={{ padding: "14px 12px" }}>
@@ -352,7 +471,6 @@ function Accounts() {
             backgroundColor: "white", borderRadius: "12px",
             padding: "24px", boxShadow: "0 1px 4px rgba(0,0,0,0.06)"
           }}>
-
             {!customerDetail ? (
               <p style={{ color: "#64748b", textAlign: "center" }}>Loading...</p>
             ) : (
@@ -364,39 +482,23 @@ function Accounts() {
                   flexWrap: "wrap", gap: "12px"
                 }}>
                   <div>
-                    <h2 style={{
-                      fontSize: "20px", fontWeight: "800",
-                      color: "#1e3a5f", margin: "0 0 4px"
-                    }}>
+                    <h2 style={{ fontSize: "20px", fontWeight: "800", color: "#1e3a5f", margin: "0 0 4px" }}>
                       {customerDetail.Customer.cname}
                     </h2>
-                    <p style={{
-                      color: "#64748b", margin: "0",
-                      fontSize: "13px"
-                    }}>
+                    <p style={{ color: "#64748b", margin: "0", fontSize: "13px" }}>
                       📞 {customerDetail.Customer.cphone}
-                      {customerDetail.Customer.cmail &&
-                        ` • 📧 ${customerDetail.Customer.cmail}`}
+                      {customerDetail.Customer.cmail && ` • 📧 ${customerDetail.Customer.cmail}`}
                     </p>
                   </div>
 
                   {/* Due + Pay */}
-                  <div style={{
-                    display: "flex", gap: "10px",
-                    alignItems: "center", flexWrap: "wrap"
-                  }}>
+                  <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap" }}>
                     <div style={{
                       backgroundColor: "#fef2f2", padding: "10px 16px",
                       borderRadius: "8px", textAlign: "center"
                     }}>
-                      <div style={{
-                        fontSize: "11px", color: "#dc2626",
-                        fontWeight: "700"
-                      }}>TOTAL DUE</div>
-                      <div style={{
-                        fontSize: "18px", fontWeight: "800",
-                        color: "#dc2626"
-                      }}>
+                      <div style={{ fontSize: "11px", color: "#dc2626", fontWeight: "700" }}>TOTAL DUE</div>
+                      <div style={{ fontSize: "18px", fontWeight: "800", color: "#dc2626" }}>
                         Rs {customerDetail.Customer.currently_due_amount.toFixed(2)}
                       </div>
                     </div>
@@ -404,14 +506,8 @@ function Accounts() {
                       backgroundColor: "#f0fdf4", padding: "10px 16px",
                       borderRadius: "8px", textAlign: "center"
                     }}>
-                      <div style={{
-                        fontSize: "11px", color: "#15803d",
-                        fontWeight: "700"
-                      }}>LAST PAID</div>
-                      <div style={{
-                        fontSize: "18px", fontWeight: "800",
-                        color: "#15803d"
-                      }}>
+                      <div style={{ fontSize: "11px", color: "#15803d", fontWeight: "700" }}>LAST PAID</div>
+                      <div style={{ fontSize: "18px", fontWeight: "800", color: "#15803d" }}>
                         Rs {customerDetail.Customer.last_paid_amount.toFixed(2)}
                       </div>
                     </div>
@@ -427,10 +523,9 @@ function Accounts() {
                     display: "flex", gap: "10px", alignItems: "center",
                     flexWrap: "wrap"
                   }}>
-                    <span style={{
-                      fontWeight: "700", color: "#b45309",
-                      fontSize: "13px"
-                    }}>💰 Record Payment:</span>
+                    <span style={{ fontWeight: "700", color: "#b45309", fontSize: "13px" }}>
+                      💰 Record Payment:
+                    </span>
                     <input
                       type="number"
                       placeholder="Enter amount"
@@ -457,13 +552,11 @@ function Accounts() {
                 )}
 
                 {/* Bill History */}
-
-                <h3 style={{
-                  fontSize: "15px", fontWeight: "700",
-                  color: "#1e3a5f", marginBottom: "14px"
-                }}>
+                <h3 style={{ fontSize: "15px", fontWeight: "700", color: "#1e3a5f", marginBottom: "14px" }}>
                   Bill History ({customerDetail.CustomerBills?.filter(b => b.payment_type === "Monthly Account").length || 0} bills)
-                </h3>{(() => {
+                </h3>
+
+                {(() => {
                   const monthlyBills = customerDetail.CustomerBills?.filter(
                     b => b.payment_type === "Monthly Account"
                   ) || [];
@@ -576,46 +669,40 @@ function Accounts() {
                         })}
 
                         {/* Month Footer */}
-                        
-
-                            {/* Month Footer */}
-                            <div style={{
-                              backgroundColor: "#fffbeb", padding: "10px 16px",
-                              display: "flex", justifyContent: "space-between",
-                              alignItems: "center", flexWrap: "wrap", gap: "8px",
-                              borderTop: "1px solid #fcd34d"
-                            }}>
-                              <span style={{ fontWeight: "700", color: "#b45309", fontSize: "13px" }}>
-                                Month Total: Rs {total.toFixed(2)}
-                              </span>
-                              <div style={{ display: "flex", gap: "8px" }}>
-                                <button onClick={() => handleMonthlyWhatsApp(key, grouped[key])} style={{
-                                  backgroundColor: "#16a34a", color: "white", border: "none",
-                                  borderRadius: "6px", padding: "6px 12px",
-                                  cursor: "pointer", fontSize: "12px", fontWeight: "700"
-                                }}>📱 Share {label}</button>
-                                <button onClick={() => handleMonthlyPDF(key, grouped[key])} style={{
-                                  backgroundColor: "#dc2626", color: "white", border: "none",
-                                  borderRadius: "6px", padding: "6px 12px",
-                                  cursor: "pointer", fontSize: "12px", fontWeight: "700"
-                                }}>⬇ PDF {label}</button>
-
-                                {/* DELETE BUTTON */}
-                                <button onClick={() => handleDeleteMonth(key, label)} style={{
-                                  backgroundColor: "#7f1d1d", color: "white", border: "none",
-                                  borderRadius: "6px", padding: "6px 12px",
-                                  cursor: "pointer", fontSize: "12px", fontWeight: "700"
-                                }}>🗑 Delete {label}</button>
-                              </div>
-                            </div>
+                        <div style={{
+                          backgroundColor: "#fffbeb", padding: "10px 16px",
+                          display: "flex", justifyContent: "space-between",
+                          alignItems: "center", flexWrap: "wrap", gap: "8px",
+                          borderTop: "1px solid #fcd34d"
+                        }}>
+                          <span style={{ fontWeight: "700", color: "#b45309", fontSize: "13px" }}>
+                            Month Total: Rs {total.toFixed(2)}
+                          </span>
+                          <div style={{ display: "flex", gap: "8px" }}>
+                            <button onClick={() => handleMonthlyWhatsApp(key, grouped[key])} style={{
+                              backgroundColor: "#16a34a", color: "white", border: "none",
+                              borderRadius: "6px", padding: "6px 12px",
+                              cursor: "pointer", fontSize: "12px", fontWeight: "700"
+                            }}>📱 Share {label}</button>
+                            <button onClick={() => handleMonthlyPDF(key, grouped[key])} style={{
+                              backgroundColor: "#dc2626", color: "white", border: "none",
+                              borderRadius: "6px", padding: "6px 12px",
+                              cursor: "pointer", fontSize: "12px", fontWeight: "700"
+                            }}>⬇ PDF {label}</button>
+                            <button onClick={() => handleDeleteMonth(key, label)} style={{
+                              backgroundColor: "#7f1d1d", color: "white", border: "none",
+                              borderRadius: "6px", padding: "6px 12px",
+                              cursor: "pointer", fontSize: "12px", fontWeight: "700"
+                            }}>🗑 Delete {label}</button>
                           </div>
-                      
-                    
+                        </div>
+                      </div>
                     );
                   });
                 })()}
 
-                <button onClick={() => navigate(`/PaymentHistory/${selectedCid}`)} style={{
+                <button onClick={() => navigate("/PaymentHistory")}
+ style={{
                   marginTop: "8px", marginLeft: "8px", padding: "8px 18px",
                   backgroundColor: "#1e3a5f", color: "white",
                   border: "none", borderRadius: "6px",
@@ -623,13 +710,12 @@ function Accounts() {
                 }}>
                   📋 View Full History
                 </button>
-                <button onClick={() => { setSelectedCid(null); setCustomerDetail(null); }}
-                  style={{
-                    marginTop: "8px", padding: "8px 18px",
-                    backgroundColor: "#f1f5f9", color: "#1e3a5f",
-                    border: "none", borderRadius: "6px",
-                    cursor: "pointer", fontWeight: "700", fontSize: "13px"
-                  }}>
+                <button onClick={() => { setSelectedCid(null); setCustomerDetail(null); }} style={{
+                  marginTop: "8px", padding: "8px 18px",
+                  backgroundColor: "#f1f5f9", color: "#1e3a5f",
+                  border: "none", borderRadius: "6px",
+                  cursor: "pointer", fontWeight: "700", fontSize: "13px"
+                }}>
                   ✕ Close
                 </button>
               </>

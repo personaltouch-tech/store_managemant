@@ -1,8 +1,9 @@
 import { useState } from "react";
-import axios from "axios";
 import { isAllowedName, isValidEmail } from "../utils/validation";
 import { Link, useNavigate } from "react-router-dom";
 import "./auth.css";
+import api from "../api/api";
+
 
 function Signup() {
   const [username, setUsername] = useState("");

@@ -28,7 +28,7 @@ function Signup() {
 
     try {
       setLoading(true);
-      await axios.post("http://127.0.0.1:8000/admin/create_admin", {
+      await api.post("/admin/create_admin", {
         username,
         email,
         password,

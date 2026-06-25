@@ -7,6 +7,7 @@ class categories(Base):
     cid         = Column(Integer, primary_key=True)
     cname       = Column(String)
     description = Column(String)
+    is_active = Column(Boolean, default=True)
     created_at  = Column(
         TIMESTAMP(timezone=True),
         nullable=False,

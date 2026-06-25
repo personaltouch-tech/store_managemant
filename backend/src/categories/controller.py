@@ -24,6 +24,6 @@ def delete_category(cid: int, db: Session):
     cat = db.query(categories).filter(categories.cid == cid).first()
     if not cat:
         raise HTTPException(404, detail="Category not found")
-    db.delete(cat)
+    cat.is_active = False
     db.commit()
     return {"message": "Category deleted"}

@@ -143,16 +143,12 @@ const handleMonthlyWhatsApp = (key, monthData) => {
   const c = customerDetail.Customer;
   const { label, bills, total } = monthData;
 
-  const billLines = bills.map((bill, idx) => {
-    const billItems = customerDetail.BillItems.filter(i => i.bid === bill.bid);
+  const billSummary = bills.map((bill, idx) => {
     const date = new Date(bill.created_at).toLocaleDateString("en-IN", {
       day: "2-digit", month: "short"
     });
-    const itemLines = billItems
-      .map(item => `   • ${item.product_name} x${item.quantity} = Rs.${item.subtotal.toFixed(2)}`)
-      .join("\n");
-    return `${idx + 1}. Bill #${bill.bid} — ${date}\n${itemLines}\n   💰 Rs.${bill.total_amount.toFixed(2)}`;
-  }).join("\n\n");
+    return `${idx + 1}. Bill #${bill.bid} — ${date} — *Rs.${bill.total_amount.toFixed(2)}*`;
+  }).join("\n");
 
   const msg = [
     `🏪 *GANGADHAR PROVISION STORE*`,
@@ -160,20 +156,22 @@ const handleMonthlyWhatsApp = (key, monthData) => {
     `📊 *${label} Statement*`,
     `👤 ${c.cname}  |  📞 ${c.cphone}`,
     `━━━━━━━━━━━━━━━━━━━━━`,
-    ``,
-    billLines,
-    ``,
+    billSummary,
     `━━━━━━━━━━━━━━━━━━━━━`,
-    `📦 Bills      : ${bills.length}`,
-    `💰 Month Total: *Rs.${total.toFixed(2)}*`,
-    `🔴 Total Due  : *Rs.${c.currently_due_amount.toFixed(2)}*`,
+    `📦 Total Bills  : ${bills.length}`,
+    `💰 Month Total  : *Rs.${total.toFixed(2)}*`,
+    `🔴 Total Due    : *Rs.${c.currently_due_amount.toFixed(2)}*`,
     `━━━━━━━━━━━━━━━━━━━━━`,
     `🙏 Please clear dues.`,
     `📍 Gangadhar Provision Store`,
   ].join("\n");
 
   const phone = c.cphone ? `91${c.cphone}` : "";
-  window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, "_blank", "noopener,noreferrer");
+  window.open(
+    `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`,
+    "_blank",
+    "noopener,noreferrer"
+  );
 };
   // ── MONTHLY PDF ───────────────────────────────────────────
   const handleMonthlyPDF = async (key, monthData) => {

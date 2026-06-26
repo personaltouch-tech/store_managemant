@@ -1,0 +1,76 @@
+name: Daily Backup to Google Drive
+
+on:
+  schedule:
+    - cron: '0 0 * * *'  # every day at midnight UTC
+  workflow_dispatch:       # allows manual trigger too
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0  # full history
+
+      - name: Create ZIP with date
+        run: |
+          DATE=$(date +%Y-%m-%d)
+          zip -r "store_managemant_backup_${DATE}.zip" . \
+            --exclude "*.git*" \
+            --exclude "node_modules/*"
+          echo "BACKUP_FILE=store_managemant_backup_${DATE}.zip" >> $GITHUB_ENV
+
+      - name: Upload to Google Drive
+        uses: adityak74/google-drive-upload-git-action@main
+        with:
+          credentials: ${{ secrets.GDRIVE_CREDENTIALS }}
+          filename: ${{ env.BACKUP_FILE }}
+          folderId: ${{ secrets.GDRIVE_FOLDER_ID }}
+          overwrite: false
+
+      - name: Delete backups older than 30 days
+        run: |
+          pip install google-api-python-client google-auth --break-system-packages
+          python3 << 'EOF'
+          import os, json
+          from datetime import datetime, timedelta
+          from google.oauth2 import service_account
+          from googleapiclient.discovery import build
+
+          # Load credentials
+          creds_json = os.environ['GDRIVE_CREDENTIALS']
+          creds_info = json.loads(creds_json)
+          creds = service_account.Credentials.from_service_account_info(
+              creds_info,
+              scopes=['https://www.googleapis.com/auth/drive']
+          )
+          service = build('drive', 'v3', credentials=creds)
+
+          folder_id = os.environ['GDRIVE_FOLDER_ID']
+          cutoff = datetime.utcnow() - timedelta(days=30)
+
+          # List all backup files in folder
+          results = service.files().list(
+              q=f"'{folder_id}' in parents and name contains 'store_managemant_backup'",
+              fields="files(id, name, createdTime)",
+              orderBy="createdTime asc"
+          ).execute()
+
+          files = results.get('files', [])
+          print(f"Total backups found: {len(files)}")
+
+          # Delete if more than 30
+          if len(files) > 30:
+              to_delete = files[:len(files) - 30]
+              for f in to_delete:
+                  service.files().delete(fileId=f['id']).execute()
+                  print(f"Deleted: {f['name']}")
+          else:
+              print("No cleanup needed")
+          EOF
+        env:
+          GDRIVE_CREDENTIALS: ${{ secrets.GDRIVE_CREDENTIALS }}
+          GDRIVE_FOLDER_ID: ${{ secrets.GDRIVE_FOLDER_ID }}

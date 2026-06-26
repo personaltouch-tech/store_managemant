@@ -18,27 +18,18 @@ jobs:
       - name: Install dependencies
         run: pip install google-api-python-client google-auth --break-system-packages
 
-      - name: Test Drive connection
+      - name: Install rclone
+        run: curl https://rclone.org/install.sh | sudo bash
+
+      - name: Configure rclone
         run: |
-          python3 << 'EOF'
-          import os, json
-          from google.oauth2 import service_account
-          from googleapiclient.discovery import build
-
-          creds_info = json.loads(os.environ['GDRIVE_CREDENTIALS'])
-          creds = service_account.Credentials.from_service_account_info(
-              creds_info,
-              scopes=['https://www.googleapis.com/auth/drive']
-          )
-          service = build('drive', 'v3', credentials=creds)
-          folder_id = os.environ['GDRIVE_FOLDER_ID']
-
-          # Test: get folder details
-          folder = service.files().get(
-              fileId=folder_id,
-              fields='id, name'
-          ).execute()
-          print(f"Folder found: {folder.get('name')} - {folder.get('id')}")
+          mkdir -p ~/.config/rclone
+          cat > ~/.config/rclone/rclone.conf << EOF
+          [gdrive]
+          type = drive
+          scope = drive
+          service_account_credentials = $GDRIVE_CREDENTIALS
+          root_folder_id = $GDRIVE_FOLDER_ID
           EOF
         env:
           GDRIVE_CREDENTIALS: ${{ secrets.GDRIVE_CREDENTIALS }}
@@ -53,41 +44,11 @@ jobs:
           echo "BACKUP_FILE=store_managemant_backup_${DATE}.zip" >> $GITHUB_ENV
 
       - name: Upload to Google Drive
-        run: |
-          python3 << 'EOF'
-          import os, json
-          from google.oauth2 import service_account
-          from googleapiclient.discovery import build
-          from googleapiclient.http import MediaFileUpload
-
-          creds_info = json.loads(os.environ['GDRIVE_CREDENTIALS'])
-          creds = service_account.Credentials.from_service_account_info(
-              creds_info,
-              scopes=['https://www.googleapis.com/auth/drive']
-          )
-          service = build('drive', 'v3', credentials=creds)
-
-          folder_id = os.environ['GDRIVE_FOLDER_ID']
-          backup_file = os.environ['BACKUP_FILE']
-
-          file_metadata = {
-              'name': backup_file,
-              'parents': [folder_id]
-          }
-          media = MediaFileUpload(backup_file, mimetype='application/zip')
-          file = service.files().create(
-              body=file_metadata,
-              media_body=media,
-              fields='id, name'
-          ).execute()
-          print(f"Uploaded: {file.get('name')}")
-          EOF
+        run: rclone copy "$BACKUP_FILE" gdrive:/
         env:
-          GDRIVE_CREDENTIALS: ${{ secrets.GDRIVE_CREDENTIALS }}
-          GDRIVE_FOLDER_ID: ${{ secrets.GDRIVE_FOLDER_ID }}
           BACKUP_FILE: ${{ env.BACKUP_FILE }}
 
-      - name: Delete backups older than 30
+      - name: Delete backups older than 30 days
         run: |
           python3 << 'EOF'
           import os, json
@@ -105,7 +66,9 @@ jobs:
           results = service.files().list(
               q=f"'{folder_id}' in parents and name contains 'store_managemant_backup'",
               fields="files(id, name, createdTime)",
-              orderBy="createdTime asc"
+              orderBy="createdTime asc",
+              supportsAllDrives=True,
+              includeItemsFromAllDrives=True
           ).execute()
 
           files = results.get('files', [])

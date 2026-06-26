@@ -15,22 +15,19 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Install dependencies
-        run: pip install google-api-python-client google-auth --break-system-packages
-
       - name: Install rclone
         run: curl https://rclone.org/install.sh | sudo bash
 
       - name: Configure rclone
         run: |
           mkdir -p ~/.config/rclone
-          # Write credentials to a file first
-          echo '${{ secrets.GDRIVE_CREDENTIALS }}' > /tmp/sa_credentials.json
           cat > ~/.config/rclone/rclone.conf << EOF
           [gdrive]
           type = drive
           scope = drive
-          service_account_file = /tmp/sa_credentials.json
+          client_id = ${{ secrets.RCLONE_CLIENT_ID }}
+          client_secret = ${{ secrets.RCLONE_CLIENT_SECRET }}
+          token = ${{ secrets.RCLONE_TOKEN }}
           root_folder_id = ${{ secrets.GDRIVE_FOLDER_ID }}
           EOF
 
@@ -49,42 +46,12 @@ jobs:
 
       - name: Delete backups older than 30 days
         run: |
-          python3 << 'EOF'
-          import os, json
-          from google.oauth2 import service_account
-          from googleapiclient.discovery import build
-
-          with open('/tmp/sa_credentials.json') as f:
-              creds_info = json.load(f)
-
-          creds = service_account.Credentials.from_service_account_info(
-              creds_info,
-              scopes=['https://www.googleapis.com/auth/drive']
-          )
-          service = build('drive', 'v3', credentials=creds)
-          folder_id = os.environ['GDRIVE_FOLDER_ID']
-
-          results = service.files().list(
-              q=f"'{folder_id}' in parents and name contains 'store_managemant_backup'",
-              fields="files(id, name, createdTime)",
-              orderBy="createdTime asc",
-              supportsAllDrives=True,
-              includeItemsFromAllDrives=True
-          ).execute()
-
-          files = results.get('files', [])
-          print(f"Total backups: {len(files)}")
-
-          if len(files) > 30:
-              to_delete = files[:len(files) - 30]
-              for f in to_delete:
-                  service.files().delete(
-                      fileId=f['id'],
-                      supportsAllDrives=True
-                  ).execute()
-                  print(f"Deleted: {f['name']}")
-          else:
-              print("No cleanup needed")
-          EOF
-        env:
-          GDRIVE_FOLDER_ID: ${{ secrets.GDRIVE_FOLDER_ID }}
+          rclone ls gdrive:/ | grep "store_managemant_backup" | sort | head -n -30 | awk '{print $2}' | while read file; do
+            rclone delete "gdrive:/$file"
+            echo "Deleted: $file"
+          done
+        
+      - name: Show backup count
+        run: |
+          COUNT=$(rclone ls gdrive:/ | grep "store_managemant_backup" | wc -l)
+          echo "Total backups: $COUNT"

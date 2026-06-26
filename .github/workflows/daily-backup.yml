@@ -2,8 +2,8 @@ name: Daily Backup to Google Drive
 
 on:
   schedule:
-    - cron: '0 0 * * *'  # every day at midnight UTC
-  workflow_dispatch:       # allows manual trigger too
+    - cron: '0 0 * * *'
+  workflow_dispatch:
 
 jobs:
   backup:
@@ -11,9 +11,9 @@ jobs:
 
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # full history
+          fetch-depth: 0
 
       - name: Create ZIP with date
         run: |
@@ -24,23 +24,14 @@ jobs:
           echo "BACKUP_FILE=store_managemant_backup_${DATE}.zip" >> $GITHUB_ENV
 
       - name: Upload to Google Drive
-        uses: adityak74/google-drive-upload-git-action@main
-        with:
-          credentials: ${{ secrets.GDRIVE_CREDENTIALS }}
-          filename: ${{ env.BACKUP_FILE }}
-          folderId: ${{ secrets.GDRIVE_FOLDER_ID }}
-          overwrite: false
-
-      - name: Delete backups older than 30 days
         run: |
           pip install google-api-python-client google-auth --break-system-packages
           python3 << 'EOF'
           import os, json
-          from datetime import datetime, timedelta
           from google.oauth2 import service_account
           from googleapiclient.discovery import build
+          from googleapiclient.http import MediaFileUpload
 
-          # Load credentials
           creds_json = os.environ['GDRIVE_CREDENTIALS']
           creds_info = json.loads(creds_json)
           creds = service_account.Credentials.from_service_account_info(
@@ -50,9 +41,41 @@ jobs:
           service = build('drive', 'v3', credentials=creds)
 
           folder_id = os.environ['GDRIVE_FOLDER_ID']
-          cutoff = datetime.utcnow() - timedelta(days=30)
+          backup_file = os.environ['BACKUP_FILE']
 
-          # List all backup files in folder
+          file_metadata = {
+              'name': backup_file,
+              'parents': [folder_id]
+          }
+          media = MediaFileUpload(backup_file, mimetype='application/zip')
+          file = service.files().create(
+              body=file_metadata,
+              media_body=media,
+              fields='id, name'
+          ).execute()
+          print(f"Uploaded: {file.get('name')} with ID: {file.get('id')}")
+          EOF
+        env:
+          GDRIVE_CREDENTIALS: ${{ secrets.GDRIVE_CREDENTIALS }}
+          GDRIVE_FOLDER_ID: ${{ secrets.GDRIVE_FOLDER_ID }}
+          BACKUP_FILE: ${{ env.BACKUP_FILE }}
+
+      - name: Delete backups older than 30
+        run: |
+          python3 << 'EOF'
+          import os, json
+          from google.oauth2 import service_account
+          from googleapiclient.discovery import build
+
+          creds_json = os.environ['GDRIVE_CREDENTIALS']
+          creds_info = json.loads(creds_json)
+          creds = service_account.Credentials.from_service_account_info(
+              creds_info,
+              scopes=['https://www.googleapis.com/auth/drive']
+          )
+          service = build('drive', 'v3', credentials=creds)
+          folder_id = os.environ['GDRIVE_FOLDER_ID']
+
           results = service.files().list(
               q=f"'{folder_id}' in parents and name contains 'store_managemant_backup'",
               fields="files(id, name, createdTime)",
@@ -60,9 +83,8 @@ jobs:
           ).execute()
 
           files = results.get('files', [])
-          print(f"Total backups found: {len(files)}")
+          print(f"Total backups: {len(files)}")
 
-          # Delete if more than 30
           if len(files) > 30:
               to_delete = files[:len(files) - 30]
               for f in to_delete:

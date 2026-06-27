@@ -35,7 +35,7 @@ function Signup() {
         password,
       });
 
-      localStorage.setItem("email", email);
+sessionStorage.setItem("email", email);
 
       alert("OTP sent to your email. Please verify.");
       navigate("/verify-otp");

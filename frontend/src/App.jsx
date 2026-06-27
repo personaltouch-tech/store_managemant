@@ -13,7 +13,7 @@ import AddCustomer from "./route/AddCustomer";
 
 // ✅ ProtectedRoute — redirects to /login if no token
 function ProtectedRoute({ children }) {
-  const token = localStorage.getItem("token");
+  const token = sessionStorage.getItem("token");  // ← changed
   if (!token) return <Navigate to="/login" replace />;
   return children;
 }

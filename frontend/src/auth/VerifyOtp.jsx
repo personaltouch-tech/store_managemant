@@ -15,14 +15,14 @@ function VerifyOtp() {
 
     try {
       setLoading(true);
-      const email = localStorage.getItem("email");
+      const email = sessionStorage.getItem("email");
 
       await api.post("/admin/verify_signup_otp", {
         email,
         otp_code: otp,
       });
 
-      localStorage.removeItem("email");
+      sessionStorage.removeItem("email");
       alert("Account Created Successfully! Please login.");
       navigate("/");
 
@@ -35,7 +35,7 @@ function VerifyOtp() {
 
   const resendOtp = async () => {
     try {
-      const email = localStorage.getItem("email");
+const email = sessionStorage.getItem("email");
       await api.post("/admin/send-otp", { email });
       alert("New OTP sent to your email.");
     } catch (error) {

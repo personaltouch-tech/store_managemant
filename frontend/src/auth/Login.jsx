@@ -16,8 +16,8 @@ function Login() {
   username: username,
   password: password,
 });
-      localStorage.setItem("token", response.data.token);
-      localStorage.setItem("admin", JSON.stringify(response.data.admin));
+     sessionStorage.setItem("token", response.data.token);
+    sessionStorage.setItem("admin", JSON.stringify(response.data.admin));
 
       navigate("/Dashboard");
 

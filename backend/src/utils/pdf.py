@@ -11,7 +11,11 @@ import os
 import io  # ← key change
 
 STORE_NAME    = "GANGADHAR PROVISION STORE"
-STORE_ADDRESS = "Bhavnagar, Gujarat - 364001"
+STORE_ADDRESS = """1, Ravikunj Flat, Arunodaya Soc.,
+
+B.M.C. Gas Supply Road, Alkapuri,
+
+Vadodara - 7"""
 STORE_PHONE   = "Mobile: 95860 52965"
 STORE_GSTIN   = "GSTIN: 24ADHPP9881D1Z9"
 LOGO_PATH     = "static/logo.png"

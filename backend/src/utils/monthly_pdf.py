@@ -209,7 +209,7 @@ def generate_monthly_statement_pdf(data: dict) -> bytes:
     ]))
     story.append(KeepTogether(summary))
     # ── SIGNATURE ────────────────────────────────────────────
-    SIGN_PATH = "static/sign.jpg"
+    SIGN_PATH = "static/sign.png"
 
     sign_style = ParagraphStyle("ss",
         fontName="Helvetica", fontSize=8,
@@ -261,6 +261,4 @@ def generate_monthly_statement_pdf(data: dict) -> bytes:
     buffer.seek(0)
     return buffer.read()
 
-    doc.build(story)
-    buffer.seek(0)
-    return buffer.read()
+  

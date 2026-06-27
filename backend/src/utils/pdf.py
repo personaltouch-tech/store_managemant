@@ -209,7 +209,7 @@ def generate_bill_pdf(bill_data: dict, items: list) -> bytes:  # ← returns byt
     story.append(Spacer(1, 6*mm))
 
 # ── SIGNATURE + FOOTER ───────────────────────────────────
-    SIGN_PATH = "static/sign.jpg"
+    SIGN_PATH = "static/sign.png"
 
     sign_style = ParagraphStyle("ss",
         fontName="Helvetica", fontSize=8,

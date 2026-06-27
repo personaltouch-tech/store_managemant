@@ -208,13 +208,44 @@ def generate_bill_pdf(bill_data: dict, items: list) -> bytes:  # ← returns byt
     story.append(KeepTogether(totals_table))
     story.append(Spacer(1, 6*mm))
 
-    # ── FOOTER ────────────────────────────────────────────────
+# ── SIGNATURE + FOOTER ───────────────────────────────────
+    SIGN_PATH = "static/sign.jpg"
+
+    sign_style = ParagraphStyle("ss",
+        fontName="Helvetica", fontSize=8,
+        textColor=colors.black, alignment=1)
+    sign_label = ParagraphStyle("sl",
+        fontName="Helvetica-Bold", fontSize=8,
+        textColor=DARK_BLUE, alignment=1)
+
+    # Build signature cell
+    if os.path.exists(SIGN_PATH):
+        try:
+            sign_img = Image(SIGN_PATH, width=35*mm, height=18*mm)
+        except Exception:
+            sign_img = Paragraph("", sign_style)
+    else:
+        sign_img = Paragraph("", sign_style)
+
+    sign_table = Table([
+        [Paragraph("", sign_style),
+         sign_img],
+        [Paragraph("", sign_style),
+         Paragraph("Authorised Signatory", sign_label)],
+    ], colWidths=[140*mm, 45*mm])
+    sign_table.setStyle(TableStyle([
+        ("ALIGN",         (1,0), (1,-1), "CENTER"),
+        ("TOPPADDING",    (0,0), (-1,-1), 3),
+        ("BOTTOMPADDING", (0,0), (-1,-1), 3),
+        ("LINEABOVE",     (1,1), (1,1), 0.5, DARK_BLUE),
+    ]))
+    story.append(Spacer(1, 4*mm))
+    story.append(sign_table)
+    story.append(Spacer(1, 4*mm))
+
     footer_style = ParagraphStyle("ft",
         fontName="Helvetica-Bold", fontSize=10,
         textColor=WHITE, alignment=1)
-    powered_style = ParagraphStyle("pw",
-        fontName="Helvetica", fontSize=8,
-        textColor=colors.HexColor("#93c5fd"), alignment=1)
 
     footer_table = Table([
         [Paragraph("Thank You! Visit Again", footer_style)],
@@ -228,4 +259,4 @@ def generate_bill_pdf(bill_data: dict, items: list) -> bytes:  # ← returns byt
 
     doc.build(story)
     buffer.seek(0)
-    return buffer.read()  # ← return bytes
+    return buffer.read()

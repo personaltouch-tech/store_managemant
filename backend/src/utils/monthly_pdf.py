@@ -208,6 +208,58 @@ def generate_monthly_statement_pdf(data: dict) -> bytes:
         ("LINEBELOW",     (0,0), (-1,3),  0.3, LINE_COLOR),
     ]))
     story.append(KeepTogether(summary))
+    # ── SIGNATURE ────────────────────────────────────────────
+    SIGN_PATH = "static/sign.jpg"
+
+    sign_style = ParagraphStyle("ss",
+        fontName="Helvetica", fontSize=8,
+        textColor=colors.black, alignment=1)
+    sign_label = ParagraphStyle("sl",
+        fontName="Helvetica-Bold", fontSize=8,
+        textColor=DARK_BLUE, alignment=1)
+
+    if os.path.exists(SIGN_PATH):
+        try:
+            sign_img = Image(SIGN_PATH, width=35*mm, height=18*mm)
+        except Exception:
+            sign_img = Paragraph("", sign_style)
+    else:
+        sign_img = Paragraph("", sign_style)
+
+    sign_table = Table([
+        [Paragraph("", sign_style),
+         sign_img],
+        [Paragraph("", sign_style),
+         Paragraph("Authorised Signatory", sign_label)],
+    ], colWidths=[140*mm, 45*mm])
+    sign_table.setStyle(TableStyle([
+        ("ALIGN",         (1,0), (1,-1), "CENTER"),
+        ("TOPPADDING",    (0,0), (-1,-1), 3),
+        ("BOTTOMPADDING", (0,0), (-1,-1), 3),
+        ("LINEABOVE",     (1,1), (1,1), 0.5, DARK_BLUE),
+    ]))
+    story.append(Spacer(1, 4*mm))
+    story.append(sign_table)
+    story.append(Spacer(1, 4*mm))
+
+    # ── FOOTER ────────────────────────────────────────────────
+    footer_style = ParagraphStyle("ft",
+        fontName="Helvetica-Bold", fontSize=10,
+        textColor=WHITE, alignment=1)
+
+    footer_table = Table([
+        [Paragraph("Thank You! Visit Again", footer_style)],
+    ], colWidths=[185*mm])
+    footer_table.setStyle(TableStyle([
+        ("BACKGROUND",    (0,0), (-1,-1), DARK_BLUE),
+        ("TOPPADDING",    (0,0), (-1,-1), 6),
+        ("BOTTOMPADDING", (0,0), (-1,-1), 6),
+    ]))
+    story.append(KeepTogether(footer_table))
+
+    doc.build(story)
+    buffer.seek(0)
+    return buffer.read()
 
     doc.build(story)
     buffer.seek(0)

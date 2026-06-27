@@ -1,0 +1,76 @@
+name: Daily Backup to Google Drive
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install rclone
+        run: curl https://rclone.org/install.sh | sudo bash
+
+      - name: Configure rclone
+        run: |
+          mkdir -p ~/.config/rclone
+          cat > ~/.config/rclone/rclone.conf << EOF
+          [gdrive]
+          type = drive
+          scope = drive
+          client_id = ${{ secrets.RCLONE_CLIENT_ID }}
+          client_secret = ${{ secrets.RCLONE_CLIENT_SECRET }}
+          token = ${{ secrets.RCLONE_TOKEN }}
+          root_folder_id = ${{ secrets.GDRIVE_FOLDER_ID }}
+          EOF
+
+      - name: Install PostgreSQL 18 client
+        run: |
+          sudo apt-get install -y curl ca-certificates
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc --fail https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          sudo sh -c 'echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt noble-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client-18
+          pg_dump --version
+
+      - name: Dump PostgreSQL Database
+        run: |
+          export PGPASSWORD="${{ secrets.RAILWAY_DB_PASS }}"
+          pg_dump \
+            -h ${{ secrets.RAILWAY_DB_HOST }} \
+            -p ${{ secrets.RAILWAY_DB_PORT }} \
+            -U ${{ secrets.RAILWAY_DB_USER }} \
+            -d ${{ secrets.RAILWAY_DB_NAME }} \
+            --format=plain \
+            --no-password \
+            > database_backup.sql
+          echo "✅ Database dump size: $(du -sh database_backup.sql)"
+
+      - name: Create ZIP with date
+        run: |
+          DATE=$(date +%Y-%m-%d)
+          zip -r "store_managemant_backup_${DATE}.zip" . \
+            --exclude "*.git*" \
+            --exclude "node_modules/*"
+          echo "BACKUP_FILE=store_managemant_backup_${DATE}.zip" >> $GITHUB_ENV
+
+      - name: Upload to Google Drive
+        run: rclone copy "${{ env.BACKUP_FILE }}" gdrive:/
+
+      - name: Delete backups older than 30 days
+        run: |
+          rclone ls gdrive:/ | grep "store_managemant_backup" | sort | head -n -30 | awk '{print $2}' | while read file; do
+            rclone delete "gdrive:/$file"
+            echo "Deleted: $file"
+          done
+
+      - name: Show backup count
+        run: |
+          COUNT=$(rclone ls gdrive:/ | grep "store_managemant_backup" | wc -l)
+          echo "Total backups: $COUNT"

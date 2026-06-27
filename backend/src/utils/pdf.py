@@ -218,7 +218,6 @@ def generate_bill_pdf(bill_data: dict, items: list) -> bytes:  # ← returns byt
 
     footer_table = Table([
         [Paragraph("Thank You! Visit Again", footer_style)],
-        [Paragraph("Powered by Personal Touch", powered_style)],
     ], colWidths=[185*mm])
     footer_table.setStyle(TableStyle([
         ("BACKGROUND",    (0,0), (-1,-1), DARK_BLUE),

@@ -21,6 +21,7 @@ function Billing() {
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState("");
   const [billDone, setBillDone] = useState(null);
+  const [cashMethod, setCashMethod] = useState("Cash");
 
   useEffect(() => { loadData(); }, []);
 
@@ -99,7 +100,7 @@ function Billing() {
 
       const billRes = await api.post("/bill/create_bill", {
         cid: Number(cid),
-        payment_type: "Cash"
+        payment_type: cashMethod  
       });
       const bid = billRes.data;
 
@@ -120,7 +121,7 @@ function Billing() {
         ...billDetail.data,
         bid,
         items: selectedItems,
-        paymentType: "Cash",
+        paymentType: cashMethod  ,
         phone: cashPhone,
         email: "",
       });
@@ -331,12 +332,37 @@ function Billing() {
                     boxSizing: "border-box", outline: "none"
                   }}
                 />
+
+                {/* ADD THIS — Cash or UPI selection */}
+                <label style={{
+                  fontSize: "13px", fontWeight: "600",
+                  color: "#374151", marginBottom: "6px", display: "block"
+                }}>
+                  Payment Method
+                </label>
+                <div style={{ display: "flex", gap: "8px", marginBottom: "14px" }}>
+                  {["Cash", "UPI"].map(method => (
+                    <button
+                      key={method}
+                      onClick={() => setCashMethod(method)}
+                      style={{
+                        flex: 1, padding: "8px",
+                        backgroundColor: cashMethod === method ? "#15803d" : "#f1f5f9",
+                        color: cashMethod === method ? "white" : "#374151",
+                        border: "none", borderRadius: "8px",
+                        cursor: "pointer", fontWeight: "600", fontSize: "13px"
+                      }}
+                    >
+                      {method === "Cash" ? "💵 Cash" : "📱 UPI"}
+                    </button>
+                  ))}
+                </div>
+
                 <p style={{ fontSize: "12px", color: "#64748b", marginBottom: "14px" }}>
                   Bill will be sent to this WhatsApp number
                 </p>
               </>
             )}
-
             {/* Monthly Account */}
             {paymentType === "Monthly Account" && (
               <>

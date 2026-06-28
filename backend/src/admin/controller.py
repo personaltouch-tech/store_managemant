@@ -34,7 +34,7 @@ def admin_registar(body: RegisterSchema, db: Session):
     new_admin = admin(
         username=body.username,
         email=body.email,
-        password=hashed_pw,       # ✅ fixed: was 'apassword', model has 'password'
+        password=hashed_pw,
         is_verified=False
     )
     db.add(new_admin)
@@ -45,15 +45,19 @@ def admin_registar(body: RegisterSchema, db: Session):
 
 
 def send_otp(body: SendOTPSchema, db: Session):
-    owner = db.query(admin).filter(admin.email == body.email).first()
+    # ✅ SECURITY FIX: Always get the ONE owner from database
+    owner = db.query(admin).first()
+
+    # ✅ Never tell anyone if account exists or not (security)
     if not owner:
-        raise HTTPException(404, detail="No account found with this email")
+        raise HTTPException(404, detail="No admin account found")
 
     otp_code = str(random.randint(100000, 999999))
     expires_at = datetime.now(timezone.utc) + timedelta(minutes=10)
 
+    # ✅ Always save OTP against OWNER's email from DB, not user input
     new_otp = OTPVerification(
-        email=body.email,
+        email=owner.email,
         otp_code=otp_code,
         expires_at=expires_at,
         is_used=False
@@ -61,13 +65,14 @@ def send_otp(body: SendOTPSchema, db: Session):
     db.add(new_otp)
     db.commit()
 
-    send_otp_email_via_brevo(body.email, otp_code, owner.username)
+    # ✅ Always send OTP to OWNER's email from DB, not user input
+    send_otp_email_via_brevo(owner.email, otp_code, owner.username)
 
-    return {"message": f"OTP sent to {body.email}. Valid for 10 minutes."}
+    # ✅ Don't reveal which email OTP was sent to
+    return {"message": "OTP sent to registered email. Valid for 10 minutes."}
 
 
 def send_otp_email_via_brevo(email: str, otp_code: str, username: str):
-    print(settings.BREVO_API_KEY)
     url = "https://api.brevo.com/v3/smtp/email"
     headers = {
         "accept": "application/json",
@@ -102,10 +107,15 @@ def send_otp_email_via_brevo(email: str, otp_code: str, username: str):
 def verify_otp(body: VerifyOTPSchema, db: Session):
     now = datetime.now(timezone.utc)
 
+    # ✅ Always verify against OWNER's email from DB
+    owner = db.query(admin).first()
+    if not owner:
+        raise HTTPException(400, detail="No admin account found")
+
     otp_record = (
         db.query(OTPVerification)
         .filter(
-            OTPVerification.email == body.email,
+            OTPVerification.email == owner.email,  # ✅ owner.email not body.email
             OTPVerification.is_used == False
         )
         .order_by(OTPVerification.created_at.desc())
@@ -122,10 +132,7 @@ def verify_otp(body: VerifyOTPSchema, db: Session):
         raise HTTPException(400, detail="Wrong OTP. Please try again.")
 
     otp_record.is_used = True
-
-    owner = db.query(admin).filter(admin.email == body.email).first()
     owner.is_verified = True
-
     db.commit()
 
     return {"message": "Email verified successfully. You can now login."}
@@ -137,26 +144,13 @@ def admin_login(body: loginSchema, db: Session):
     ).first()
 
     if not owner:
-        raise HTTPException(
-            400,
-            detail="No user found with given username"
-        )
-    print(f"DEBUG - Plain text entered: {body.password}")
-    print(f"DEBUG - Hash from database: {owner.password}") 
-    if not verify_password(
-        body.password,
-        owner.password
-    ):
-        raise HTTPException(
-            401,
-            detail="Incorrect password"
-        )
+        raise HTTPException(400, detail="No user found with given username")
+
+    if not verify_password(body.password, owner.password):
+        raise HTTPException(401, detail="Incorrect password")
 
     if not owner.is_verified:
-        raise HTTPException(
-            403,
-            detail="Email not verified. Please verify your email first."
-        )
+        raise HTTPException(403, detail="Email not verified. Please verify your email first.")
 
     token = create_access_token({
         "admin_id": owner.id,

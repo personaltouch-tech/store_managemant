@@ -7,7 +7,7 @@ def get_categories(db: Session):
 
 def create_category(body, db: Session):
     existing = db.query(categories).filter(
-        categories.cname == body.cname, categories.is_active == False
+        categories.cname == body.cname, categories.is_active == True
     ).first()
     if existing:
         raise HTTPException(400, detail="Category already exists")

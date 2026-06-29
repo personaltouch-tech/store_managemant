@@ -24,7 +24,7 @@ def serialize_product(p: products) -> dict:
 def create_product(body: createProductSchema, db: Session):
     # Check category exists — remove is_active check
     cat = db.query(categories).filter(
-        categories.cid == body.cid
+        categories.cid == body.cid, products.is_active == False
     ).first()
 
     if not cat:

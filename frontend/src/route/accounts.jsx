@@ -22,6 +22,11 @@ function Accounts() {
   const [newCustomer, setNewCustomer] = useState({ cname: "", cphone: "", cmail: "" });
   const [addLoading, setAddLoading] = useState(false);
   const [filterType, setFilterType] = useState("default");
+  // Calculates the REAL bill total by adding up all item subtotals
+function getBillTotal(bill, allBillItems) {
+  const items = allBillItems.filter(i => i.bid === bill.bid);
+  return items.reduce((sum, item) => sum + item.subtotal, 0);
+}
 
   useEffect(() => { loadCustomers(); }, []);
 
@@ -44,7 +49,7 @@ function Accounts() {
       setNotice("Failed to load customers");
     } finally { setLoading(false); }
   }
-
+  
   async function openCustomer(cid) {
     setSelectedCid(cid);
     setCustomerDetail(null);
@@ -83,87 +88,121 @@ const handleWhatsApp = (bill, items) => {
     day: "2-digit", month: "short", year: "numeric"
   });
 
+  const EMOJI = {
+    store: "\u{1F3EA}",
+    tag: "\u{1F516}",
+    calendar: "\u{1F4C5}",
+    person: "\u{1F464}",
+    card: "\u{1F4B3}",
+    money: "\u{1F4B0}",
+    red: "\u{1F534}",
+    pray: "\u{1F64F}",
+  };
+  const LINE = "\u2501".repeat(21);
+
+  const billTotal = getBillTotal(bill, customerDetail.BillItems);
+
   const itemLines = items
     .map((item, i) => `${i + 1}. ${item.product_name} x${item.quantity} = Rs.${item.subtotal.toFixed(2)}`)
     .join("\n");
 
   const msg = [
-    `🏪 *GANGADHAR PROVISION STORE*`,
-    `━━━━━━━━━━━━━━━━━━━━━`,
-    `🔖 Bill #${bill.bid}  |  📅 ${date}`,
-    `👤 ${c.cname}  |  💳 ${bill.payment_type}`,
-    `━━━━━━━━━━━━━━━━━━━━━`,
+    `${EMOJI.store} *GANGADHAR PROVISION STORE*`,
+    LINE,
+    `${EMOJI.tag} Bill #${bill.bid}  |  ${EMOJI.calendar} ${date}`,
+    `${EMOJI.person} ${c.cname}  |  ${EMOJI.card} ${bill.payment_type}`,
+    LINE,
     itemLines,
-    `━━━━━━━━━━━━━━━━━━━━━`,
-    `💰 *Total : Rs.${bill.total_amount.toFixed(2)}*`,
-    `🔴 Due   : Rs.${c.currently_due_amount.toFixed(2)}`,
-    `━━━━━━━━━━━━━━━━━━━━━`,
-    `🙏 Gangadhar Provision Store`,
+    LINE,
+    `${EMOJI.money} *Total : Rs.${billTotal.toFixed(2)}*`,
+    `${EMOJI.red} Due   : Rs.${c.currently_due_amount.toFixed(2)}`,
+    LINE,
+    `${EMOJI.pray} Gangadhar Provision Store`,
   ].join("\n");
 
   const phone = c.cphone ? `91${c.cphone}` : "";
   window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, "_blank", "noopener,noreferrer");
 };
   // ── PDF DOWNLOAD ──────────────────────────────────────────
-  const handlePDF = async (bill, items) => {
-    const c = customerDetail.Customer;
-    try {
-      const res = await api.post("/bill/generate_pdf", {
-        bill_data: {
-          bid: bill.bid,
-          cname: c.cname,
-          phone: c.cphone || "",
-          total_amount: bill.total_amount.toFixed(2),
-          payment_type: bill.payment_type,
-          created_at: new Date(bill.created_at).toLocaleDateString("en-IN"),
-        },
-        items: items.map(i => ({
-          product_name: i.product_name,
-          quantity: i.quantity,
-          unit_price: i.unit_price.toFixed(2),
-          subtotal: i.subtotal.toFixed(2),
-        }))
-      }, { responseType: "blob" });
+const handlePDF = async (bill, items) => {
+  const c = customerDetail.Customer;
+  const billTotal = getBillTotal(bill, customerDetail.BillItems);
+  try {
+    const res = await api.post("/bill/generate_pdf", {
+      bill_data: {
+        bid: bill.bid,
+        cname: c.cname,
+        phone: c.cphone || "",
+        total_amount: billTotal.toFixed(2),
+        payment_type: bill.payment_type,
+        created_at: new Date(bill.created_at).toLocaleDateString("en-IN"),
+      },
+      items: items.map(i => ({
+        product_name: i.product_name,
+        quantity: i.quantity,
+        unit_price: i.unit_price.toFixed(2),
+        subtotal: i.subtotal.toFixed(2),
+      }))
+    }, { responseType: "blob" });
 
-      const url = window.URL.createObjectURL(new Blob([res.data]));
-      const a = document.createElement("a");
-      a.href = url;
-      a.setAttribute("download", `Bill_${bill.bid}.pdf`);
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      window.URL.revokeObjectURL(url);
-    } catch {
-      alert("Failed to generate PDF");
-    }
-  };
-
+    const url = window.URL.createObjectURL(new Blob([res.data]));
+    const a = document.createElement("a");
+    a.href = url;
+    a.setAttribute("download", `Bill_${bill.bid}.pdf`);
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(url);
+  } catch {
+    alert("Failed to generate PDF");
+  }
+};
   // ── MONTHLY STATEMENT WHATSAPP ────────────────────────────
 const handleMonthlyWhatsApp = (key, monthData) => {
   const c = customerDetail.Customer;
-  const { label, bills, total } = monthData;
+  const { label, bills } = monthData;
+
+  const EMOJI = {
+    store: "\u{1F3EA}",
+    chart: "\u{1F4CA}",
+    person: "\u{1F464}",
+    phone: "\u{1F4DE}",
+    box: "\u{1F4E6}",
+    money: "\u{1F4B0}",
+    red: "\u{1F534}",
+    pray: "\u{1F64F}",
+    pin: "\u{1F4CD}",
+  };
+  const LINE = "\u2501".repeat(21);
+
+  // Recalculate real total from actual item prices, not saved total_amount
+  const realTotal = bills.reduce(
+    (sum, bill) => sum + getBillTotal(bill, customerDetail.BillItems),
+    0
+  );
 
   const billSummary = bills.map((bill, idx) => {
     const date = new Date(bill.created_at).toLocaleDateString("en-IN", {
       day: "2-digit", month: "short"
     });
-    return `${idx + 1}. Bill #${bill.bid} — ${date} — *Rs.${bill.total_amount.toFixed(2)}*`;
+    const billTotal = getBillTotal(bill, customerDetail.BillItems);
+    return `${idx + 1}. Bill #${bill.bid} - ${date} - *Rs.${billTotal.toFixed(2)}*`;
   }).join("\n");
 
   const msg = [
-    `🏪 *GANGADHAR PROVISION STORE*`,
-    `━━━━━━━━━━━━━━━━━━━━━`,
-    `📊 *${label} Statement*`,
-    `👤 ${c.cname}  |  📞 ${c.cphone}`,
-    `━━━━━━━━━━━━━━━━━━━━━`,
+    `${EMOJI.store} *GANGADHAR PROVISION STORE*`,
+    LINE,
+    `${EMOJI.chart} *${label} Statement*`,
+    `${EMOJI.person} ${c.cname}  |  ${EMOJI.phone} ${c.cphone}`,
+    LINE,
     billSummary,
-    `━━━━━━━━━━━━━━━━━━━━━`,
-    `📦 Total Bills  : ${bills.length}`,
-    `💰 Month Total  : *Rs.${total.toFixed(2)}*`,
-    `🔴 Total Due    : *Rs.${c.currently_due_amount.toFixed(2)}*`,
-    `━━━━━━━━━━━━━━━━━━━━━`,
-    `🙏 Please clear dues.`,
-    `📍 Gangadhar Provision Store`,
+    LINE,
+    `${EMOJI.box} Total Bills  : ${bills.length}`,
+    `${EMOJI.money} Month Total  : *Rs.${realTotal.toFixed(2)}*`,
+    `${EMOJI.red} Total Due    : *Rs.${c.currently_due_amount.toFixed(2)}*`,
+    LINE,
+    `${EMOJI.pray} Please clear dues.`,
+    `${EMOJI.pin} Gangadhar Provision Store`,
   ].join("\n");
 
   const phone = c.cphone ? `91${c.cphone}` : "";
@@ -175,60 +214,65 @@ const handleMonthlyWhatsApp = (key, monthData) => {
 };
   // ── MONTHLY PDF ───────────────────────────────────────────
   const handleMonthlyPDF = async (key, monthData) => {
-    const c = customerDetail.Customer;
-    const { label, bills, total } = monthData;
+  const c = customerDetail.Customer;
+  const { label, bills } = monthData;
 
-    const allItems = [];
-    bills.forEach(bill => {
-      const date = new Date(bill.created_at).toLocaleDateString("en-IN", {
-        day: "2-digit", month: "short"
-      });
+  const allItems = [];
+  let realTotal = 0;
+
+  bills.forEach(bill => {
+    const date = new Date(bill.created_at).toLocaleDateString("en-IN", {
+      day: "2-digit", month: "short"
+    });
+    const billTotal = getBillTotal(bill, customerDetail.BillItems);
+    realTotal += billTotal;
+
+    allItems.push({
+      product_name: `── Bill #${bill.bid}  (${date}) ──`,
+      quantity: "", unit_price: "", subtotal: "", is_header: true
+    });
+    const billItems = customerDetail.BillItems.filter(i => i.bid === bill.bid);
+    billItems.forEach(item => {
       allItems.push({
-        product_name: `── Bill #${bill.bid}  (${date}) ──`,
-        quantity: "", unit_price: "", subtotal: "", is_header: true
-      });
-      const billItems = customerDetail.BillItems.filter(i => i.bid === bill.bid);
-      billItems.forEach(item => {
-        allItems.push({
-          product_name: item.product_name,
-          quantity: item.quantity,
-          unit_price: item.unit_price.toFixed(2),
-          subtotal: item.subtotal.toFixed(2),
-        });
-      });
-      allItems.push({
-        product_name: `Bill #${bill.bid} Total`,
-        quantity: "", unit_price: "",
-        subtotal: bill.total_amount.toFixed(2),
-        is_total: true
+        product_name: item.product_name,
+        quantity: item.quantity,
+        unit_price: item.unit_price.toFixed(2),
+        subtotal: item.subtotal.toFixed(2),
       });
     });
+    allItems.push({
+      product_name: `Bill #${bill.bid} Total`,
+      quantity: "", unit_price: "",
+      subtotal: billTotal.toFixed(2),
+      is_total: true
+    });
+  });
 
-    try {
-      const res = await api.post("/bill/generate_monthly_pdf", {
-        customer: {
-          cname: c.cname, cphone: c.cphone, cmail: c.cmail || "",
-          currently_due_amount: c.currently_due_amount.toFixed(2),
-          last_paid_amount: c.last_paid_amount.toFixed(2),
-        },
-        bills, all_items: allItems,
-        grand_total: total.toFixed(2),
-        generated_date: label,
-        total_bills: bills.length
-      }, { responseType: "blob" });
+  try {
+    const res = await api.post("/bill/generate_monthly_pdf", {
+      customer: {
+        cname: c.cname, cphone: c.cphone, cmail: c.cmail || "",
+        currently_due_amount: c.currently_due_amount.toFixed(2),
+        last_paid_amount: c.last_paid_amount.toFixed(2),
+      },
+      bills, all_items: allItems,
+      grand_total: realTotal.toFixed(2),
+      generated_date: label,
+      total_bills: bills.length
+    }, { responseType: "blob" });
 
-      const url = window.URL.createObjectURL(new Blob([res.data]));
-      const a = document.createElement("a");
-      a.href = url;
-      a.setAttribute("download", `Statement_${c.cname}_${label}.pdf`);
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      window.URL.revokeObjectURL(url);
-    } catch {
-      alert("Failed to generate PDF");
-    }
-  };
+    const url = window.URL.createObjectURL(new Blob([res.data]));
+    const a = document.createElement("a");
+    a.href = url;
+    a.setAttribute("download", `Statement_${c.cname}_${label}.pdf`);
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(url);
+  } catch {
+    alert("Failed to generate PDF");
+  }
+};
 
   const handleDeleteMonth = async (key, label) => {
     const confirm1 = window.confirm(
@@ -295,8 +339,10 @@ const handleMonthlyWhatsApp = (key, monthData) => {
             padding: "28px", width: "100%", maxWidth: "400px",
             boxShadow: "0 10px 40px rgba(0,0,0,0.2)"
           }}>
-            <h2 style={{ fontSize: "18px", fontWeight: "800",
-              color: "#1e3a5f", margin: "0 0 20px" }}>
+            <h2 style={{
+              fontSize: "18px", fontWeight: "800",
+              color: "#1e3a5f", margin: "0 0 20px"
+            }}>
               + Add New Customer
             </h2>
 
@@ -306,8 +352,10 @@ const handleMonthlyWhatsApp = (key, monthData) => {
               { label: "Email (optional)", key: "cmail", placeholder: "email@example.com", type: "email" },
             ].map(f => (
               <div key={f.key} style={{ marginBottom: "14px" }}>
-                <label style={{ fontSize: "12px", fontWeight: "700",
-                  color: "#64748b", display: "block", marginBottom: "4px" }}>
+                <label style={{
+                  fontSize: "12px", fontWeight: "700",
+                  color: "#64748b", display: "block", marginBottom: "4px"
+                }}>
                   {f.label}
                 </label>
                 <input
@@ -407,111 +455,111 @@ const handleMonthlyWhatsApp = (key, monthData) => {
         )}
 
         {/* Customer List */}
-{/* Customer List */}
-<div style={{
-  backgroundColor: "white", borderRadius: "12px",
-  padding: "20px", boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
-  marginBottom: "24px"
-}}>
-  <div style={{
-    display: "flex", justifyContent: "space-between",
-    alignItems: "center", marginBottom: "16px", gap: "12px",
-    flexWrap: "wrap"
-  }}>
-    <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-      <h2 style={{ fontSize: "18px", fontWeight: "700", color: "#1e3a5f", margin: 0 }}>
-        Customer Accounts
-      </h2>
-      <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-        {[
-          { key: 'default', label: 'All' },
-          { key: 'monthly', label: 'Monthly' },
-          { key: 'cash', label: 'Cash Customer' }
-        ].map(b => (
-          <button key={b.key} onClick={() => { setFilterType(b.key); loadCustomers(b.key); }}
-            style={{
-              padding: "6px 10px", borderRadius: "8px",
-              border: filterType === b.key ? 'none' : '1px solid #e2e8f0',
-              backgroundColor: filterType === b.key ? '#1e3a5f' : '#f8fafc',
-              color: filterType === b.key ? 'white' : '#1e3a5f',
-              fontWeight: 700, cursor: 'pointer', fontSize: '12px'
-            }}>{b.label}</button>
-        ))}
-      </div>
-    </div>
-    <input
-      type="text"
-      placeholder="Search name, phone, email"
-      value={search}
-      onChange={e => setSearch(e.target.value)}
-      style={{
-        padding: "8px 14px", border: "1px solid #e2e8f0",
-        borderRadius: "8px", fontSize: "13px",
-        width: "100%", maxWidth: "240px",
-        outline: "none", boxSizing: "border-box"
-      }}
-    />
-  </div>
+        {/* Customer List */}
+        <div style={{
+          backgroundColor: "white", borderRadius: "12px",
+          padding: "20px", boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
+          marginBottom: "24px"
+        }}>
+          <div style={{
+            display: "flex", justifyContent: "space-between",
+            alignItems: "center", marginBottom: "16px", gap: "12px",
+            flexWrap: "wrap"
+          }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+              <h2 style={{ fontSize: "18px", fontWeight: "700", color: "#1e3a5f", margin: 0 }}>
+                Customer Accounts
+              </h2>
+              <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                {[
+                  { key: 'default', label: 'All' },
+                  { key: 'monthly', label: 'Monthly' },
+                  { key: 'cash', label: 'Cash Customer' }
+                ].map(b => (
+                  <button key={b.key} onClick={() => { setFilterType(b.key); loadCustomers(b.key); }}
+                    style={{
+                      padding: "6px 10px", borderRadius: "8px",
+                      border: filterType === b.key ? 'none' : '1px solid #e2e8f0',
+                      backgroundColor: filterType === b.key ? '#1e3a5f' : '#f8fafc',
+                      color: filterType === b.key ? 'white' : '#1e3a5f',
+                      fontWeight: 700, cursor: 'pointer', fontSize: '12px'
+                    }}>{b.label}</button>
+                ))}
+              </div>
+            </div>
+            <input
+              type="text"
+              placeholder="Search name, phone, email"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              style={{
+                padding: "8px 14px", border: "1px solid #e2e8f0",
+                borderRadius: "8px", fontSize: "13px",
+                width: "100%", maxWidth: "240px",
+                outline: "none", boxSizing: "border-box"
+              }}
+            />
+          </div>
 
-  {/* ── Scrollable table wrapper ── */}
-  <div style={{
-    overflowX: "auto",
-    WebkitOverflowScrolling: "touch",
-    scrollbarWidth: "thin",
-    scrollbarColor: "#cbd5e1 transparent"
-  }}>
-    <table style={{ width: "100%", borderCollapse: "collapse", minWidth: "600px" }}>
-      <thead>
-        <tr style={{ borderBottom: "2px solid #f1f5f9" }}>
-          {["NAME", "PHONE", "EMAIL", "DUE", "LAST PAID", "ACTION"].map(h => (
-            <th key={h} style={{
-              padding: "10px 12px", textAlign: "left",
-              fontSize: "11px", color: "#64748b",
-              fontWeight: "700", letterSpacing: "0.5px",
-              whiteSpace: "nowrap"
-            }}>{h}</th>
-          ))}
-        </tr>
-      </thead>
-      <tbody>
-        {filtered.map(c => (
-          <tr key={c.cid} style={{ borderBottom: "1px solid #f8fafc" }}>
-            <td style={{ padding: "14px 12px", fontWeight: "700", color: "#1e293b" }}>
-              {c.cname}
-            </td>
-            <td style={{ padding: "14px 12px", color: "#475569", whiteSpace: "nowrap" }}>
-              {c.cphone}
-            </td>
-            <td style={{ padding: "14px 12px", color: "#475569" }}>
-              {c.cmail || "-"}
-            </td>
-            <td style={{ padding: "14px 12px", whiteSpace: "nowrap" }}>
-              <span style={{
-                color: c.currently_due_amount > 0 ? "#dc2626" : "#15803d",
-                fontWeight: "700"
-              }}>
-                Rs {parseFloat(c.currently_due_amount || 0).toFixed(2)}
-              </span>
-            </td>
-            <td style={{ padding: "14px 12px", color: "#475569", whiteSpace: "nowrap" }}>
-              Rs {parseFloat(c.last_paid_amount || 0).toFixed(2)}
-            </td>
-            <td style={{ padding: "14px 12px" }}>
-              <button onClick={() => openCustomer(c.cid)} style={{
-                backgroundColor: "#1e3a5f", color: "white",
-                border: "none", borderRadius: "6px",
-                padding: "6px 14px", cursor: "pointer",
-                fontSize: "12px", fontWeight: "700",
-                whiteSpace: "nowrap"
-              }}>👁 View</button>
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  </div>{/* ← close scroll wrapper */}
+          {/* ── Scrollable table wrapper ── */}
+          <div style={{
+            overflowX: "auto",
+            WebkitOverflowScrolling: "touch",
+            scrollbarWidth: "thin",
+            scrollbarColor: "#cbd5e1 transparent"
+          }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", minWidth: "600px" }}>
+              <thead>
+                <tr style={{ borderBottom: "2px solid #f1f5f9" }}>
+                  {["NAME", "PHONE", "EMAIL", "DUE", "LAST PAID", "ACTION"].map(h => (
+                    <th key={h} style={{
+                      padding: "10px 12px", textAlign: "left",
+                      fontSize: "11px", color: "#64748b",
+                      fontWeight: "700", letterSpacing: "0.5px",
+                      whiteSpace: "nowrap"
+                    }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map(c => (
+                  <tr key={c.cid} style={{ borderBottom: "1px solid #f8fafc" }}>
+                    <td style={{ padding: "14px 12px", fontWeight: "700", color: "#1e293b" }}>
+                      {c.cname}
+                    </td>
+                    <td style={{ padding: "14px 12px", color: "#475569", whiteSpace: "nowrap" }}>
+                      {c.cphone}
+                    </td>
+                    <td style={{ padding: "14px 12px", color: "#475569" }}>
+                      {c.cmail || "-"}
+                    </td>
+                    <td style={{ padding: "14px 12px", whiteSpace: "nowrap" }}>
+                      <span style={{
+                        color: c.currently_due_amount > 0 ? "#dc2626" : "#15803d",
+                        fontWeight: "700"
+                      }}>
+                        Rs {parseFloat(c.currently_due_amount || 0).toFixed(2)}
+                      </span>
+                    </td>
+                    <td style={{ padding: "14px 12px", color: "#475569", whiteSpace: "nowrap" }}>
+                      Rs {parseFloat(c.last_paid_amount || 0).toFixed(2)}
+                    </td>
+                    <td style={{ padding: "14px 12px" }}>
+                      <button onClick={() => openCustomer(c.cid)} style={{
+                        backgroundColor: "#1e3a5f", color: "white",
+                        border: "none", borderRadius: "6px",
+                        padding: "6px 14px", cursor: "pointer",
+                        fontSize: "12px", fontWeight: "700",
+                        whiteSpace: "nowrap"
+                      }}>👁 View</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>{/* ← close scroll wrapper */}
 
-</div>{/* ← close Customer List card */}
+        </div>{/* ← close Customer List card */}
         {/* Customer Detail Panel */}
         {selectedCid && (
           <div style={{
@@ -623,7 +671,7 @@ const handleMonthlyWhatsApp = (key, monthData) => {
                     const label = date.toLocaleDateString("en-IN", { month: "long", year: "numeric" });
                     if (!grouped[key]) grouped[key] = { label, bills: [], total: 0 };
                     grouped[key].bills.push(bill);
-                    grouped[key].total += bill.total_amount;
+                    grouped[key].total += getBillTotal(bill, customerDetail.BillItems);
                   });
 
                   const sortedKeys = Object.keys(grouped).sort((a, b) => b.localeCompare(a));
@@ -685,7 +733,7 @@ const handleMonthlyWhatsApp = (key, monthData) => {
                                 </div>
                                 <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
                                   <span style={{ fontWeight: "800", color: "#1e3a5f", fontSize: "14px" }}>
-                                    Rs {bill.total_amount.toFixed(2)}
+                                    Rs {getBillTotal(bill, customerDetail.BillItems).toFixed(2)}
                                   </span>
                                   <button onClick={() => handleWhatsApp(bill, billItems)} style={{
                                     backgroundColor: "#16a34a", color: "white", border: "none",
@@ -745,6 +793,7 @@ const handleMonthlyWhatsApp = (key, monthData) => {
                                 cursor: "pointer", fontSize: "12px", fontWeight: "700"
                               }}>🗑 Delete {label}</button>
                             )}
+                            
                           </div>
                         </div>
                       </div>
@@ -753,12 +802,12 @@ const handleMonthlyWhatsApp = (key, monthData) => {
                 })()}
 
                 <button onClick={() => navigate(`/PaymentHistory/${selectedCid}`)}
- style={{
-                  marginTop: "8px", marginLeft: "8px", padding: "8px 18px",
-                  backgroundColor: "#1e3a5f", color: "white",
-                  border: "none", borderRadius: "6px",
-                  cursor: "pointer", fontWeight: "700", fontSize: "13px"
-                }}>
+                  style={{
+                    marginTop: "8px", marginLeft: "8px", padding: "8px 18px",
+                    backgroundColor: "#1e3a5f", color: "white",
+                    border: "none", borderRadius: "6px",
+                    cursor: "pointer", fontWeight: "700", fontSize: "13px"
+                  }}>
                   📋 View Full History
                 </button>
                 <button onClick={() => { setSelectedCid(null); setCustomerDetail(null); }} style={{

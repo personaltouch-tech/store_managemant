@@ -1,4 +1,3 @@
-
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../api/api";
@@ -23,6 +22,10 @@ function Billing() {
   const [notice, setNotice] = useState("");
   const [billDone, setBillDone] = useState(null);
   const [cashMethod, setCashMethod] = useState("Cash");
+
+  // ── NEW: view mode toggle (Category Wise / All Products) ──
+  const [viewMode, setViewMode] = useState("category"); // "category" | "all"
+  const [allProductSearch, setAllProductSearch] = useState("");
 
   useEffect(() => { loadData(); }, []);
 
@@ -52,6 +55,18 @@ function Billing() {
       p.product_name.toLowerCase().includes(s.toLowerCase())
     );
   };
+
+  // ── NEW: filter across ALL products regardless of category ──
+  const getFilteredAll = () => {
+    const s = allProductSearch.trim().toLowerCase();
+    if (!s) return products;
+    return products.filter(p =>
+      p.product_name.toLowerCase().includes(s)
+    );
+  };
+
+  const getCategoryName = (cid) =>
+    categories.find(c => c.cid === cid)?.cname || "";
 
   const selectedItems = useMemo(() =>
     products
@@ -271,7 +286,7 @@ function Billing() {
             <button className="ghost-btn" onClick={() => navigate("/Dashboard")}>
               Back
             </button>
-            <h1>Billing</h1>
+            <h1>Billing </h1>
             <p>Select products, choose payment type, then generate the bill.</p>
           </div>
           <div className="billing-summary">
@@ -305,9 +320,10 @@ function Billing() {
                   onClick={() => setPaymentType(type)}
                   style={{
                     flex: 1, padding: "9px",
-                    backgroundColor: paymentType === type ? "#1e3a5f" : "#f1f5f9",
-                    color: paymentType === type ? "white" : "#374151",
-                    border: "none", borderRadius: "8px",
+                    backgroundColor: paymentType === type ? "#000000" : "#f1f5f9",
+                    color: paymentType === type ? "#ffffff" : "#111111",
+                    border: paymentType === type ? "none" : "1px solid #d1d5db",
+                    borderRadius: "8px",
                     cursor: "pointer", fontWeight: "600", fontSize: "13px"
                   }}
                 >
@@ -337,7 +353,7 @@ function Billing() {
                 {/* ADD THIS — Cash or UPI selection */}
                 <label style={{
                   fontSize: "13px", fontWeight: "600",
-                  color: "#374151", marginBottom: "6px", display: "block"
+                  color: "#111111", marginBottom: "6px", display: "block"
                 }}>
                   Payment Method
                 </label>
@@ -348,9 +364,10 @@ function Billing() {
                       onClick={() => setCashMethod(method)}
                       style={{
                         flex: 1, padding: "8px",
-                        backgroundColor: cashMethod === method ? "#15803d" : "#f1f5f9",
-                        color: cashMethod === method ? "white" : "#374151",
-                        border: "none", borderRadius: "8px",
+                        backgroundColor: cashMethod === method ? "#000000" : "#f1f5f9",
+                        color: cashMethod === method ? "#ffffff" : "#111111",
+                        border: cashMethod === method ? "none" : "1px solid #d1d5db",
+                        borderRadius: "8px",
                         cursor: "pointer", fontWeight: "600", fontSize: "13px"
                       }}
                     >
@@ -359,7 +376,7 @@ function Billing() {
                   ))}
                 </div>
 
-                <p style={{ fontSize: "12px", color: "#64748b", marginBottom: "14px" }}>
+                <p style={{ fontSize: "12px", color: "#111111", marginBottom: "14px" }}>
                   Bill will be sent to this WhatsApp number
                 </p>
               </>
@@ -367,7 +384,7 @@ function Billing() {
             {/* Monthly Account */}
             {paymentType === "Monthly Account" && (
               <>
-                <label>Select Customer</label>
+                <label>Select Customer </label>
                 <select
                   value={selectedCustomer}
                   onChange={e => setSelectedCustomer(e.target.value)}
@@ -394,7 +411,7 @@ function Billing() {
                   disabled={!canAddToAccount}
                   style={{
                     width: "100%", padding: "11px 0",
-                    backgroundColor: canAddToAccount ? "#b45309" : "#d1d5db",
+                    backgroundColor: canAddToAccount ? "#000000" : "#d1d5db",
                     color: "white", border: "none", borderRadius: "8px",
                     cursor: canAddToAccount ? "pointer" : "not-allowed",
                     fontWeight: "700", fontSize: "14px", marginBottom: "10px"
@@ -404,8 +421,8 @@ function Billing() {
                 </button>
 
                 <p style={{
-                  fontSize: "12px", color: "#b45309",
-                  backgroundColor: "#fef3c7", padding: "8px 10px",
+                  fontSize: "12px", color: "#111111",
+                  backgroundColor: "#f1f5f9", padding: "8px 10px",
                   borderRadius: "6px", marginBottom: "14px"
                 }}>
                   ✓ Bill will be added to customer's monthly account
@@ -438,95 +455,228 @@ function Billing() {
           {/* RIGHT — Products */}
           <section className="product-picker">
 
-            {/* Category Cards */}
+            {/* ── NEW: Category Wise / All Products toggle ── */}
             <div style={{
-              display: "flex", flexWrap: "nowrap",
-              gap: "10px", marginBottom: "18px",
-              overflowX: "auto", paddingBottom: "6px"
+              display: "flex", gap: "10px",
+              padding: "16px 16px 0"
             }}>
-              {categories.map(cat => {
-                const isActive = activeCategory === cat.cid;
-                const selected = getProductsByCategory(cat.cid)
-                  .reduce((s, p) => s + (quantities[p.pid] || 0), 0);
-                return (
-                  <div
-                    key={cat.cid}
-                    onClick={() => setActiveCategory(isActive ? null : cat.cid)}
-                    style={{
-                      padding: "10px 16px", borderRadius: "10px",
-                      border: isActive ? "2px solid #1e3a5f" : "2px solid #e2e8f0",
-                      backgroundColor: isActive ? "#eff6ff" : "white",
-                      cursor: "pointer", textAlign: "center",
-                      minWidth: "90px", position: "relative",
-                      boxShadow: "0 1px 4px rgba(0,0,0,0.05)"
-                    }}
-                  >
-                    <div style={{
-                      width: "36px", height: "36px", borderRadius: "50%",
-                      backgroundColor: "#1e3a5f", color: "white",
-                      fontSize: "16px", fontWeight: "700",
-                      display: "flex", alignItems: "center",
-                      justifyContent: "center", margin: "0 auto 6px"
-                    }}>
-                      {cat.cname.charAt(0).toUpperCase()}
-                    </div>
-                    <div style={{
-                      fontSize: "12px", fontWeight: "700",
-                      color: "#1e293b"
-                    }}>{cat.cname}</div>
-                    <div style={{ fontSize: "10px", color: "#64748b" }}>
-                      {getProductsByCategory(cat.cid).length} items
-                    </div>
-                    {selected > 0 && (
-                      <div style={{
-                        position: "absolute", top: "-7px", right: "-7px",
-                        backgroundColor: "#2563eb", color: "white",
-                        fontSize: "10px", fontWeight: "700",
-                        padding: "2px 7px", borderRadius: "20px"
-                      }}>{selected}</div>
-                    )}
-                  </div>
-                );
-              })}
+              <button
+                onClick={() => setViewMode("category")}
+                style={{
+                  flex: 1, padding: "11px 0",
+                  backgroundColor: viewMode === "category" ? "#000000" : "#ffffff",
+                  color: viewMode === "category" ? "#ffffff" : "#111111",
+                  border: "2px solid #000000",
+                  borderRadius: "8px",
+                  cursor: "pointer", fontWeight: "700", fontSize: "13px"
+                }}
+              >
+                📂 Category Wise
+              </button>
+              <button
+                onClick={() => setViewMode("all")}
+                style={{
+                  flex: 1, padding: "11px 0",
+                  backgroundColor: viewMode === "all" ? "#000000" : "#ffffff",
+                  color: viewMode === "all" ? "#ffffff" : "#111111",
+                  border: "2px solid #000000",
+                  borderRadius: "8px",
+                  cursor: "pointer", fontWeight: "700", fontSize: "13px"
+                }}
+              >
+                🔍 All Products
+              </button>
             </div>
 
-            {/* Active Category Products */}
-            {activeCategory && activeCat && (
+            {/* ── CATEGORY WISE MODE (original behaviour) ── */}
+            {viewMode === "category" && (
+              <>
+                {/* Category Cards */}
+                <div style={{
+                  display: "flex", flexWrap: "nowrap",
+                  gap: "10px", margin: "18px 16px",
+                  overflowX: "auto", paddingBottom: "6px"
+                }}>
+                  {categories.map(cat => {
+                    const isActive = activeCategory === cat.cid;
+                    const selected = getProductsByCategory(cat.cid)
+                      .reduce((s, p) => s + (quantities[p.pid] || 0), 0);
+                    return (
+                      <div
+                        key={cat.cid}
+                        onClick={() => setActiveCategory(isActive ? null : cat.cid)}
+                        style={{
+                          padding: "10px 16px", borderRadius: "10px",
+                          border: isActive ? "2px solid #000000" : "2px solid #e2e8f0",
+                          backgroundColor: isActive ? "#f1f5f9" : "white",
+                          cursor: "pointer", textAlign: "center",
+                          minWidth: "90px", position: "relative",
+                          boxShadow: "0 1px 4px rgba(0,0,0,0.05)"
+                        }}
+                      >
+                        <div style={{
+                          width: "36px", height: "36px", borderRadius: "50%",
+                          backgroundColor: "#000000", color: "white",
+                          fontSize: "16px", fontWeight: "700",
+                          display: "flex", alignItems: "center",
+                          justifyContent: "center", margin: "0 auto 6px"
+                        }}>
+                          {cat.cname.charAt(0).toUpperCase()}
+                        </div>
+                        <div style={{
+                          fontSize: "12px", fontWeight: "700",
+                          color: "#111111"
+                        }}>{cat.cname}</div>
+                        <div style={{ fontSize: "10px", color: "#4b5563" }}>
+                          {getProductsByCategory(cat.cid).length} items
+                        </div>
+                        {selected > 0 && (
+                          <div style={{
+                            position: "absolute", top: "-7px", right: "-7px",
+                            backgroundColor: "#000000", color: "white",
+                            fontSize: "10px", fontWeight: "700",
+                            padding: "2px 7px", borderRadius: "20px"
+                          }}>{selected}</div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Active Category Products */}
+                {activeCategory && activeCat && (
+                  <div style={{
+                    backgroundColor: "white", borderRadius: "12px",
+                    overflow: "hidden", boxShadow: "0 1px 6px rgba(0,0,0,0.07)",
+                    maxHeight: "calc(100vh - 320px)", overflowY: "auto",
+                    margin: "0 16px 16px"
+                  }}>
+                    <div style={{
+                      display: "flex", justifyContent: "space-between",
+                      alignItems: "center", padding: "12px 16px",
+                      backgroundColor: "#000000"
+                    }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        <span style={{
+                          fontSize: "14px", fontWeight: "700",
+                          color: "white"
+                        }}>{activeCat.cname}</span>
+                        <span style={{
+                          fontSize: "11px", color: "#111111",
+                          backgroundColor: "rgba(255,255,255,0.85)",
+                          padding: "2px 8px", borderRadius: "20px"
+                        }}>
+                          {getProductsByCategory(activeCategory).length} products
+                        </span>
+                      </div>
+                      <input
+                        type="text"
+                        placeholder={`Search ${activeCat.cname}...`}
+                        value={searches[activeCategory] || ""}
+                        onChange={e => setSearches(prev => ({
+                          ...prev, [activeCategory]: e.target.value
+                        }))}
+                        style={{
+                          padding: "6px 10px",
+                          border: "1px solid rgba(255,255,255,0.5)",
+                          borderRadius: "6px", fontSize: "12px", width: "160px",
+                          backgroundColor: "rgba(255,255,255,0.15)",
+                          color: "white", outline: "none"
+                        }}
+                      />
+                    </div>
+
+                    {loading ? (
+                      <div className="empty-state">Loading...</div>
+                    ) : (
+                      <div className="billing-product-grid">
+                        {getFiltered(activeCategory).map(product => {
+                          const qty = quantities[product.pid] || 0;
+                          return (
+                            <article
+                              className={`billing-product-card ${qty ? "selected" : ""}`}
+                              key={product.pid}
+                            >
+                              <div className="billing-product-image">
+                                {product.image_url ? (
+                                  <img
+                                    src={`${api.defaults.baseURL}${product.image_url}`}
+                                    alt={product.product_name}
+                                    style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                                    onError={(e) => {
+                                      e.target.style.display = "none";
+                                      e.target.nextSibling.style.display = "flex";
+                                    }}
+                                  />
+                                ) : null}
+                                <span style={{
+                                  display: product.image_url ? "none" : "flex",
+                                  width: "100%", height: "100%",
+                                  alignItems: "center", justifyContent: "center",
+                                  fontSize: "28px", fontWeight: "800", color: "#000000"
+                                }}>
+                                  {product.product_name.charAt(0).toUpperCase()}
+                                </span>
+                              </div>
+                              <div className="billing-product-body">
+                                <h3>{product.product_name}</h3>
+                                <p>{product.unit || ""}</p>
+                                <strong>Rs {Number(product.price).toFixed(2)}</strong>
+                              </div>
+                              <div className="quantity-control">
+                                <button
+                                  onClick={() => changeQty(product.pid, qty - 1)}
+                                  disabled={qty === 0}
+                                >-</button>
+                                <span>{qty}</span>
+                                <button onClick={() => changeQty(product.pid, qty + 1)}>+</button>
+                              </div>
+                            </article>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* ── ALL PRODUCTS MODE (new feature) ── */}
+            {viewMode === "all" && (
               <div style={{
                 backgroundColor: "white", borderRadius: "12px",
                 overflow: "hidden", boxShadow: "0 1px 6px rgba(0,0,0,0.07)",
-                maxHeight: "calc(100vh - 320px)", overflowY: "auto"
+                maxHeight: "calc(100vh - 260px)", overflowY: "auto",
+                margin: "18px 16px 16px"
               }}>
                 <div style={{
                   display: "flex", justifyContent: "space-between",
                   alignItems: "center", padding: "12px 16px",
-                  backgroundColor: "#1e3a5f"
+                  backgroundColor: "#000000"
                 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                     <span style={{
                       fontSize: "14px", fontWeight: "700",
                       color: "white"
-                    }}>{activeCat.cname}</span>
+                    }}>All Products</span>
                     <span style={{
-                      fontSize: "11px", color: "#93c5fd",
-                      backgroundColor: "rgba(255,255,255,0.15)",
+                      fontSize: "11px", color: "#111111",
+                      backgroundColor: "rgba(255,255,255,0.85)",
                       padding: "2px 8px", borderRadius: "20px"
                     }}>
-                      {getProductsByCategory(activeCategory).length} products
+                      {products.length} products
                     </span>
                   </div>
                   <input
                     type="text"
-                    placeholder={`Search ${activeCat.cname}...`}
-                    value={searches[activeCategory] || ""}
-                    onChange={e => setSearches(prev => ({
-                      ...prev, [activeCategory]: e.target.value
-                    }))}
+                    placeholder="Search all products..."
+                    value={allProductSearch}
+                    onChange={e => setAllProductSearch(e.target.value)}
                     style={{
                       padding: "6px 10px",
-                      border: "1px solid rgba(255,255,255,0.3)",
-                      borderRadius: "6px", fontSize: "12px", width: "160px",
-                      backgroundColor: "rgba(255,255,255,0.1)",
+                      border: "1px solid rgba(255,255,255,0.5)",
+                      borderRadius: "6px", fontSize: "12px", width: "200px",
+                      backgroundColor: "rgba(255,255,255,0.15)",
                       color: "white", outline: "none"
                     }}
                   />
@@ -536,7 +686,7 @@ function Billing() {
                   <div className="empty-state">Loading...</div>
                 ) : (
                   <div className="billing-product-grid">
-                    {getFiltered(activeCategory).map(product => {
+                    {getFilteredAll().map(product => {
                       const qty = quantities[product.pid] || 0;
                       return (
                         <article
@@ -559,14 +709,14 @@ function Billing() {
                               display: product.image_url ? "none" : "flex",
                               width: "100%", height: "100%",
                               alignItems: "center", justifyContent: "center",
-                              fontSize: "28px", fontWeight: "800", color: "#0369a1"
+                              fontSize: "28px", fontWeight: "800", color: "#000000"
                             }}>
                               {product.product_name.charAt(0).toUpperCase()}
                             </span>
                           </div>
                           <div className="billing-product-body">
                             <h3>{product.product_name}</h3>
-                            <p>{product.unit || ""}</p>
+                            <p>{product.unit || ""} {getCategoryName(product.cid) && `• ${getCategoryName(product.cid)}`}</p>
                             <strong>Rs {Number(product.price).toFixed(2)}</strong>
                           </div>
                           <div className="quantity-control">
@@ -580,6 +730,9 @@ function Billing() {
                         </article>
                       );
                     })}
+                    {getFilteredAll().length === 0 && (
+                      <div className="empty-state">No products found.</div>
+                    )}
                   </div>
                 )}
               </div>
@@ -592,7 +745,7 @@ function Billing() {
       {/* SUCCESS POPUP */}
       {billDone && (
         <div style={{
-          position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.5)",
+          position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.6)",
           display: "flex", alignItems: "center",
           justifyContent: "center", zIndex: 1000
         }}>
@@ -604,13 +757,13 @@ function Billing() {
           }}>
             <div style={{
               fontSize: "16px", fontWeight: "700",
-              color: "#15803d", textAlign: "center", marginBottom: "4px"
+              color: "#000000", textAlign: "center", marginBottom: "4px"
             }}>
               ✓ {billDone.paymentType === "Monthly Account"
                 ? "Added to Monthly Account!" : "Bill Generated Successfully!"}
             </div>
             <div style={{
-              fontSize: "13px", color: "#64748b",
+              fontSize: "13px", color: "#4b5563",
               textAlign: "center", marginBottom: "16px"
             }}>
               Bill #{billDone.bid}
@@ -637,8 +790,7 @@ function Billing() {
                 <span>Payment</span>
                 <span style={{
                   fontWeight: "700",
-                  color: billDone.paymentType === "Monthly Account"
-                    ? "#b45309" : "#15803d"
+                  color: "#000000"
                 }}>
                   {billDone.paymentType}
                 </span>
@@ -671,7 +823,7 @@ function Billing() {
                 borderTop: "2px solid #e2e8f0"
               }}>
                 <span>Total</span>
-                <span style={{ color: "#15803d" }}>
+                <span style={{ color: "#000000" }}>
                   ₹{parseFloat(billDone.total_amount).toFixed(2)}
                 </span>
               </div>
@@ -680,7 +832,7 @@ function Billing() {
             {/* Monthly Account Note */}
             {billDone.paymentType === "Monthly Account" && (
               <div style={{
-                backgroundColor: "#fef3c7", color: "#b45309",
+                backgroundColor: "#f1f5f9", color: "#000000",
                 fontSize: "12px", fontWeight: "600",
                 padding: "8px 12px", borderRadius: "6px",
                 marginBottom: "14px", textAlign: "center"
@@ -709,7 +861,7 @@ function Billing() {
 
               style={{
                 width: "100%", padding: "11px 0",
-                backgroundColor: "#1e3a5f", color: "white",
+                backgroundColor: "#000000", color: "white",
                 border: "none", borderRadius: "8px",
                 cursor: "pointer", fontSize: "14px", fontWeight: "700"
               }}

@@ -357,3 +357,37 @@
         grid-template-columns: repeat(2, 1fr);
     }
 }
+
+@media (max-width: 600px) {
+    .billing-product-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+        padding: 12px;
+    }
+    .billing-product-card {
+        grid-template-rows: 90px 1fr auto;
+        min-height: 170px;
+    }
+    .billing-product-body h3 {
+        font-size: 15px;
+        line-height: 1.2;
+    }
+    .billing-product-body p {
+        font-size: 11px;
+    }
+    .billing-product-body strong {
+        font-size: 14px;
+    }
+    .quantity-control {
+        grid-template-columns: 32px 1fr 32px;
+        gap: 6px;
+    }
+    .quantity-control button {
+        height: 32px;
+        font-size: 16px;
+    }
+    .quantity-control span {
+        height: 32px;
+        font-size: 13px;
+    }
+}

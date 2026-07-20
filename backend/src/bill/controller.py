@@ -3,33 +3,62 @@ from sqlalchemy.orm import Session
 from src.customer.model import customer
 from src.bill.model import bill, bill_items
 
+# def createBillItems(body: createBillItemSchema, db: Session):
+#     subtotal = body.quantity * body.unit_price
+#     new_BillItems = bill_items(
+#         bid=body.bid,
+#         pid=body.pid,
+#         quantity=body.quantity,
+#         unit_price=body.unit_price,
+#         subtotal=subtotal
+#     )
+#     db.add(new_BillItems)
+#     db.commit()
+#     db.refresh(new_BillItems)
+
+#     # Update total_amount in bill
+#     current_bill = db.query(bill).filter(bill.bid == body.bid).first()
+#     if current_bill:
+#         current_bill.total_amount += subtotal
+
+#         # ✅ Only update due amount if Monthly Account
+#         if current_bill.payment_type == "Monthly Account":
+#             current_customer = db.query(customer).filter(
+#                 customer.cid == current_bill.cid
+#             ).first()
+#             if current_customer:
+#                 current_customer.currently_due_amount += subtotal
+
+#     db.commit()
+#     return new_BillItems
+
+from sqlalchemy import update
+
 def createBillItems(body: createBillItemSchema, db: Session):
     subtotal = body.quantity * body.unit_price
     new_BillItems = bill_items(
-        bid=body.bid,
-        pid=body.pid,
-        quantity=body.quantity,
-        unit_price=body.unit_price,
-        subtotal=subtotal
+        bid=body.bid, pid=body.pid, quantity=body.quantity,
+        unit_price=body.unit_price, subtotal=subtotal
     )
     db.add(new_BillItems)
+
+    # atomic increment at the DB level — no read-then-write race
+    db.execute(
+        update(bill)
+        .where(bill.bid == body.bid)
+        .values(total_amount=bill.total_amount + subtotal)
+    )
+
+    current_bill = db.query(bill).filter(bill.bid == body.bid).first()
+    if current_bill and current_bill.payment_type == "Monthly Account":
+        db.execute(
+            update(customer)
+            .where(customer.cid == current_bill.cid)
+            .values(currently_due_amount=customer.currently_due_amount + subtotal)
+        )
+
     db.commit()
     db.refresh(new_BillItems)
-
-    # Update total_amount in bill
-    current_bill = db.query(bill).filter(bill.bid == body.bid).first()
-    if current_bill:
-        current_bill.total_amount += subtotal
-
-        # ✅ Only update due amount if Monthly Account
-        if current_bill.payment_type == "Monthly Account":
-            current_customer = db.query(customer).filter(
-                customer.cid == current_bill.cid
-            ).first()
-            if current_customer:
-                current_customer.currently_due_amount += subtotal
-
-    db.commit()
     return new_BillItems
 
 def createBill(body: createBillSchema, db: Session):

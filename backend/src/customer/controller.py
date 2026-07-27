@@ -111,6 +111,51 @@ def pay_customer(cid: int, amount: float, db: Session):
         "last_paid_amount": float(customer_data.last_paid_amount),
         "currently_due_amount": float(customer_data.currently_due_amount)
     }
+   
+def delete_bill_item(biid: int, db: Session):
+    item = db.query(bill_items).filter(bill_items.biid == biid).first()
+    if not item:
+        raise HTTPException(404, detail="Bill item not found")
+
+    bid = item.bid
+    item_subtotal = float(item.subtotal)
+
+    # find the parent bill + customer
+    Bill = db.query(bill).filter(bill.bid == bid).first()
+    if not Bill:
+        raise HTTPException(404, detail="Bill not found")
+
+    cust = db.query(customer).filter(customer.cid == Bill.cid).first()
+
+    # delete the item
+    db.delete(item)
+    db.flush()  # so the next query doesn't see the deleted row
+
+    # recompute remaining items for this bill
+    remaining_items = db.query(bill_items).filter(bill_items.bid == bid).all()
+    new_bill_total = sum(float(i.subtotal) for i in remaining_items)
+
+    bill_deleted = False
+    if remaining_items:
+        Bill.total_amount = new_bill_total
+    else:
+        # no items left, drop the empty bill entirely
+        db.delete(Bill)
+        bill_deleted = True
+
+    # reduce customer's due amount by exactly what was removed
+    if cust:
+        cust.currently_due_amount = max(0, float(cust.currently_due_amount) - item_subtotal)
+
+    db.commit()
+
+    return {
+        "message": "Item deleted successfully",
+        "bid": bid,
+        "bill_deleted": bill_deleted,
+        "new_bill_total": new_bill_total if not bill_deleted else 0,
+        "currently_due_amount": float(cust.currently_due_amount) if cust else None
+    }    
     
 def delete_month_bills(cid: int, month_key: str, db: Session):
     year, month = month_key.split("-")

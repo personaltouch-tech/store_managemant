@@ -75,6 +75,9 @@ def generate_monthly_statement_pdf(data: dict) -> bytes:
     story.append(header_table)
     story.append(Spacer(1, 4*mm))
 
+    composition_style = ParagraphStyle("comp",
+    fontName="Helvetica-Oblique", fontSize=7.5,
+    textColor=DARK_BLUE, alignment=1, spaceAfter=2)
     # ── CUSTOMER INFO ─────────────────────────────────────────
     lbl = ParagraphStyle("lbl", fontName="Helvetica-Bold",
             fontSize=8, textColor=DARK_BLUE)
@@ -259,6 +262,10 @@ def generate_monthly_statement_pdf(data: dict) -> bytes:
         ("TOPPADDING",    (0,0), (-1,-1), 6),
         ("BOTTOMPADDING", (0,0), (-1,-1), 6),
     ]))
+    story.append(Paragraph(
+        "Composition Taxable Person, Not Eligible To Collect Tax On Supplies",
+        composition_style
+    ))
     story.append(KeepTogether(footer_table))
 
     doc.build(story)

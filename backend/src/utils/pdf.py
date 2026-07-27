@@ -221,7 +221,9 @@ def generate_bill_pdf(bill_data: dict, items: list) -> bytes:  # ← returns byt
     sign_label = ParagraphStyle("sl",
         fontName="Helvetica-Bold", fontSize=8,
         textColor=DARK_BLUE, alignment=1)
-
+    composition_style = ParagraphStyle("comp",
+    fontName="Helvetica-Oblique", fontSize=7.5,
+    textColor=DARK_BLUE, alignment=1, spaceAfter=2)
     # Build signature cell
     if os.path.exists(SIGN_PATH):
         try:
@@ -259,6 +261,10 @@ def generate_bill_pdf(bill_data: dict, items: list) -> bytes:  # ← returns byt
         ("TOPPADDING",    (0,0), (-1,-1), 6),
         ("BOTTOMPADDING", (0,0), (-1,-1), 6),
     ]))
+    story.append(Paragraph(
+        "Composition Taxable Person, Not Eligible To Collect Tax On Supplies",
+        composition_style
+    ))
     story.append(KeepTogether(footer_table))
 
     doc.build(story)

@@ -40,3 +40,7 @@ def pay_customer(cid: int, body: PaymentSchema, db: Session = Depends(get_db), _
 @customer_route.post("/delete_month_bills/{cid}", status_code=status.HTTP_200_OK)
 def delete_month_bills(cid: int, body: DeleteMonthSchema, db: Session = Depends(get_db), _: any = Depends(get_current_admin)):
     return controller.delete_month_bills(cid, body.month_key, db)
+
+@customer_route.post("/delete_bill_item/{biid}", status_code=status.HTTP_200_OK)
+def delete_bill_item(biid: int, db: Session = Depends(get_db), _: any = Depends(get_current_admin)):
+    return controller.delete_bill_item(biid, db)

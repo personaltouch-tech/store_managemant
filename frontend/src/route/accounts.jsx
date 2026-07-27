@@ -23,10 +23,10 @@ function Accounts() {
   const [addLoading, setAddLoading] = useState(false);
   const [filterType, setFilterType] = useState("default");
   // Calculates the REAL bill total by adding up all item subtotals
-function getBillTotal(bill, allBillItems) {
-  const items = allBillItems.filter(i => i.bid === bill.bid);
-  return items.reduce((sum, item) => sum + item.subtotal, 0);
-}
+  function getBillTotal(bill, allBillItems) {
+    const items = allBillItems.filter(i => i.bid === bill.bid);
+    return items.reduce((sum, item) => sum + item.subtotal, 0);
+  }
 
   useEffect(() => { loadCustomers(); }, []);
 
@@ -49,7 +49,7 @@ function getBillTotal(bill, allBillItems) {
       setNotice("Failed to load customers");
     } finally { setLoading(false); }
   }
-  
+
   async function openCustomer(cid) {
     setSelectedCid(cid);
     setCustomerDetail(null);
@@ -62,7 +62,55 @@ function getBillTotal(bill, allBillItems) {
       setNotice("Failed to load customer details");
     }
   }
+async function handleDeleteItem(item, bill) {
+  const confirmed = window.confirm(
+    `Delete "${item.product_name} x${item.quantity}" (Rs ${item.subtotal.toFixed(2)}) from Bill #${bill.bid}?\n\nThis will update the bill total and customer due amount.`
+  );
+  if (!confirmed) return;
 
+  try {
+    const res = await api.post(`/customer/delete_bill_item/${item.biid}`);
+    const { bill_deleted, new_bill_total, currently_due_amount } = res.data;
+
+    // Update local state in place — no refetch, no flicker
+    setCustomerDetail(prev => {
+      if (!prev) return prev;
+
+      // Remove the deleted item from BillItems
+      const updatedBillItems = prev.BillItems.filter(i => i.biid !== item.biid);
+
+      // Remove or update the bill in CustomerBills
+      const updatedCustomerBills = bill_deleted
+        ? prev.CustomerBills.filter(b => b.bid !== bill.bid)
+        : prev.CustomerBills.map(b =>
+            b.bid === bill.bid ? { ...b, total_amount: new_bill_total } : b
+          );
+
+      return {
+        ...prev,
+        BillItems: updatedBillItems,
+        CustomerBills: updatedCustomerBills,
+        Customer: {
+          ...prev.Customer,
+          currently_due_amount: currently_due_amount ?? prev.Customer.currently_due_amount
+        }
+      };
+    });
+
+    // Update the customer list row (due amount) without reloading the whole table
+    setCustomers(prev =>
+      prev.map(c =>
+        c.cid === selectedCid
+          ? { ...c, currently_due_amount: currently_due_amount ?? c.currently_due_amount }
+          : c
+      )
+    );
+
+    setNotice("✅ Item deleted and totals updated.");
+  } catch (err) {
+    alert(err?.response?.data?.detail || "Failed to delete item");
+  }
+}
   async function handlePayment() {
     const amount = parseFloat(payAmount);
     if (!amount || amount <= 0) return alert("Enter valid amount");
@@ -82,197 +130,197 @@ function getBillTotal(bill, allBillItems) {
   }
 
   // ── WHATSAPP BILL ─────────────────────────────────────────
-const handleWhatsApp = (bill, items) => {
-  const c = customerDetail.Customer;
-  const date = new Date(bill.created_at).toLocaleDateString("en-IN", {
-    day: "2-digit", month: "short", year: "numeric"
-  });
-
-  const EMOJI = {
-    store: "\u{1F3EA}",
-    tag: "\u{1F516}",
-    calendar: "\u{1F4C5}",
-    person: "\u{1F464}",
-    card: "\u{1F4B3}",
-    money: "\u{1F4B0}",
-    red: "\u{1F534}",
-    pray: "\u{1F64F}",
-  };
-  const LINE = "\u2501".repeat(21);
-
-  const billTotal = getBillTotal(bill, customerDetail.BillItems);
-
-  const itemLines = items
-    .map((item, i) => `${i + 1}. ${item.product_name} x${item.quantity} = Rs.${item.subtotal.toFixed(2)}`)
-    .join("\n");
-
-  const msg = [
-    `${EMOJI.store} *GANGADHAR PROVISION STORE*`,
-    LINE,
-    `${EMOJI.tag} Bill #${bill.bid}  |  ${EMOJI.calendar} ${date}`,
-    `${EMOJI.person} ${c.cname}  |  ${EMOJI.card} ${bill.payment_type}`,
-    LINE,
-    itemLines,
-    LINE,
-    `${EMOJI.money} *Total : Rs.${billTotal.toFixed(2)}*`,
-    `${EMOJI.red} Due   : Rs.${c.currently_due_amount.toFixed(2)}`,
-    LINE,
-    `${EMOJI.pray} Gangadhar Provision Store`,
-  ].join("\n");
-
-  const phone = c.cphone ? `91${c.cphone}` : "";
-  window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, "_blank", "noopener,noreferrer");
-};
-  // ── PDF DOWNLOAD ──────────────────────────────────────────
-const handlePDF = async (bill, items) => {
-  const c = customerDetail.Customer;
-  const billTotal = getBillTotal(bill, customerDetail.BillItems);
-  try {
-    const res = await api.post("/bill/generate_pdf", {
-      bill_data: {
-        bid: bill.bid,
-        cname: c.cname,
-        phone: c.cphone || "",
-        total_amount: billTotal.toFixed(2),
-        payment_type: bill.payment_type,
-        created_at: new Date(bill.created_at).toLocaleDateString("en-IN"),
-      },
-      items: items.map(i => ({
-        product_name: i.product_name,
-        quantity: i.quantity,
-        unit_price: i.unit_price.toFixed(2),
-        subtotal: i.subtotal.toFixed(2),
-      }))
-    }, { responseType: "blob" });
-
-    const url = window.URL.createObjectURL(new Blob([res.data]));
-    const a = document.createElement("a");
-    a.href = url;
-    a.setAttribute("download", `Bill_${bill.bid}.pdf`);
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    window.URL.revokeObjectURL(url);
-  } catch {
-    alert("Failed to generate PDF");
-  }
-};
-  // ── MONTHLY STATEMENT WHATSAPP ────────────────────────────
-const handleMonthlyWhatsApp = (key, monthData) => {
-  const c = customerDetail.Customer;
-  const { label, bills } = monthData;
-
-  const EMOJI = {
-    store: "\u{1F3EA}",
-    chart: "\u{1F4CA}",
-    person: "\u{1F464}",
-    phone: "\u{1F4DE}",
-    box: "\u{1F4E6}",
-    money: "\u{1F4B0}",
-    red: "\u{1F534}",
-    pray: "\u{1F64F}",
-    pin: "\u{1F4CD}",
-  };
-  const LINE = "\u2501".repeat(21);
-
-  // Recalculate real total from actual item prices, not saved total_amount
-  const realTotal = bills.reduce(
-    (sum, bill) => sum + getBillTotal(bill, customerDetail.BillItems),
-    0
-  );
-
-  const billSummary = bills.map((bill, idx) => {
+  const handleWhatsApp = (bill, items) => {
+    const c = customerDetail.Customer;
     const date = new Date(bill.created_at).toLocaleDateString("en-IN", {
-      day: "2-digit", month: "short"
+      day: "2-digit", month: "short", year: "numeric"
     });
+
+    const EMOJI = {
+      store: "\u{1F3EA}",
+      tag: "\u{1F516}",
+      calendar: "\u{1F4C5}",
+      person: "\u{1F464}",
+      card: "\u{1F4B3}",
+      money: "\u{1F4B0}",
+      red: "\u{1F534}",
+      pray: "\u{1F64F}",
+    };
+    const LINE = "\u2501".repeat(21);
+
     const billTotal = getBillTotal(bill, customerDetail.BillItems);
-    return `${idx + 1}. Bill #${bill.bid} - ${date} - *Rs.${billTotal.toFixed(2)}*`;
-  }).join("\n");
 
-  const msg = [
-    `${EMOJI.store} *GANGADHAR PROVISION STORE*`,
-    LINE,
-    `${EMOJI.chart} *${label} Statement*`,
-    `${EMOJI.person} ${c.cname}  |  ${EMOJI.phone} ${c.cphone}`,
-    LINE,
-    billSummary,
-    LINE,
-    `${EMOJI.box} Total Bills  : ${bills.length}`,
-    `${EMOJI.money} Month Total  : *Rs.${realTotal.toFixed(2)}*`,
-    `${EMOJI.red} Total Due    : *Rs.${c.currently_due_amount.toFixed(2)}*`,
-    LINE,
-    `${EMOJI.pray} Please clear dues.`,
-    `${EMOJI.pin} Gangadhar Provision Store`,
-  ].join("\n");
+    const itemLines = items
+      .map((item, i) => `${i + 1}. ${item.product_name} x${item.quantity} = Rs.${item.subtotal.toFixed(2)}`)
+      .join("\n");
 
-  const phone = c.cphone ? `91${c.cphone}` : "";
-  window.open(
-    `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`,
-    "_blank",
-    "noopener,noreferrer"
-  );
-};
+    const msg = [
+      `${EMOJI.store} *GANGADHAR PROVISION STORE*`,
+      LINE,
+      `${EMOJI.tag} Bill #${bill.bid}  |  ${EMOJI.calendar} ${date}`,
+      `${EMOJI.person} ${c.cname}  |  ${EMOJI.card} ${bill.payment_type}`,
+      LINE,
+      itemLines,
+      LINE,
+      `${EMOJI.money} *Total : Rs.${billTotal.toFixed(2)}*`,
+      `${EMOJI.red} Due   : Rs.${c.currently_due_amount.toFixed(2)}`,
+      LINE,
+      `${EMOJI.pray} Gangadhar Provision Store`,
+    ].join("\n");
+
+    const phone = c.cphone ? `91${c.cphone}` : "";
+    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, "_blank", "noopener,noreferrer");
+  };
+  // ── PDF DOWNLOAD ──────────────────────────────────────────
+  const handlePDF = async (bill, items) => {
+    const c = customerDetail.Customer;
+    const billTotal = getBillTotal(bill, customerDetail.BillItems);
+    try {
+      const res = await api.post("/bill/generate_pdf", {
+        bill_data: {
+          bid: bill.bid,
+          cname: c.cname,
+          phone: c.cphone || "",
+          total_amount: billTotal.toFixed(2),
+          payment_type: bill.payment_type,
+          created_at: new Date(bill.created_at).toLocaleDateString("en-IN"),
+        },
+        items: items.map(i => ({
+          product_name: i.product_name,
+          quantity: i.quantity,
+          unit_price: i.unit_price.toFixed(2),
+          subtotal: i.subtotal.toFixed(2),
+        }))
+      }, { responseType: "blob" });
+
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const a = document.createElement("a");
+      a.href = url;
+      a.setAttribute("download", `Bill_${bill.bid}.pdf`);
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch {
+      alert("Failed to generate PDF");
+    }
+  };
+  // ── MONTHLY STATEMENT WHATSAPP ────────────────────────────
+  const handleMonthlyWhatsApp = (key, monthData) => {
+    const c = customerDetail.Customer;
+    const { label, bills } = monthData;
+
+    const EMOJI = {
+      store: "\u{1F3EA}",
+      chart: "\u{1F4CA}",
+      person: "\u{1F464}",
+      phone: "\u{1F4DE}",
+      box: "\u{1F4E6}",
+      money: "\u{1F4B0}",
+      red: "\u{1F534}",
+      pray: "\u{1F64F}",
+      pin: "\u{1F4CD}",
+    };
+    const LINE = "\u2501".repeat(21);
+
+    // Recalculate real total from actual item prices, not saved total_amount
+    const realTotal = bills.reduce(
+      (sum, bill) => sum + getBillTotal(bill, customerDetail.BillItems),
+      0
+    );
+
+    const billSummary = bills.map((bill, idx) => {
+      const date = new Date(bill.created_at).toLocaleDateString("en-IN", {
+        day: "2-digit", month: "short"
+      });
+      const billTotal = getBillTotal(bill, customerDetail.BillItems);
+      return `${idx + 1}. Bill #${bill.bid} - ${date} - *Rs.${billTotal.toFixed(2)}*`;
+    }).join("\n");
+
+    const msg = [
+      `${EMOJI.store} *GANGADHAR PROVISION STORE*`,
+      LINE,
+      `${EMOJI.chart} *${label} Statement*`,
+      `${EMOJI.person} ${c.cname}  |  ${EMOJI.phone} ${c.cphone}`,
+      LINE,
+      billSummary,
+      LINE,
+      `${EMOJI.box} Total Bills  : ${bills.length}`,
+      `${EMOJI.money} Month Total  : *Rs.${realTotal.toFixed(2)}*`,
+      `${EMOJI.red} Total Due    : *Rs.${c.currently_due_amount.toFixed(2)}*`,
+      LINE,
+      `${EMOJI.pray} Please clear dues.`,
+      `${EMOJI.pin} Gangadhar Provision Store`,
+    ].join("\n");
+
+    const phone = c.cphone ? `91${c.cphone}` : "";
+    window.open(
+      `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`,
+      "_blank",
+      "noopener,noreferrer"
+    );
+  };
   // ── MONTHLY PDF ───────────────────────────────────────────
   const handleMonthlyPDF = async (key, monthData) => {
-  const c = customerDetail.Customer;
-  const { label, bills } = monthData;
+    const c = customerDetail.Customer;
+    const { label, bills } = monthData;
 
-  const allItems = [];
-  let realTotal = 0;
+    const allItems = [];
+    let realTotal = 0;
 
-  bills.forEach(bill => {
-    const date = new Date(bill.created_at).toLocaleDateString("en-IN", {
-      day: "2-digit", month: "short"
-    });
-    const billTotal = getBillTotal(bill, customerDetail.BillItems);
-    realTotal += billTotal;
+    bills.forEach(bill => {
+      const date = new Date(bill.created_at).toLocaleDateString("en-IN", {
+        day: "2-digit", month: "short"
+      });
+      const billTotal = getBillTotal(bill, customerDetail.BillItems);
+      realTotal += billTotal;
 
-    allItems.push({
-      product_name: `── Bill #${bill.bid}  (${date}) ──`,
-      quantity: "", unit_price: "", subtotal: "", is_header: true
-    });
-    const billItems = customerDetail.BillItems.filter(i => i.bid === bill.bid);
-    billItems.forEach(item => {
       allItems.push({
-        product_name: item.product_name,
-        quantity: item.quantity,
-        unit_price: item.unit_price.toFixed(2),
-        subtotal: item.subtotal.toFixed(2),
+        product_name: `── Bill #${bill.bid}  (${date}) ──`,
+        quantity: "", unit_price: "", subtotal: "", is_header: true
+      });
+      const billItems = customerDetail.BillItems.filter(i => i.bid === bill.bid);
+      billItems.forEach(item => {
+        allItems.push({
+          product_name: item.product_name,
+          quantity: item.quantity,
+          unit_price: item.unit_price.toFixed(2),
+          subtotal: item.subtotal.toFixed(2),
+        });
+      });
+      allItems.push({
+        product_name: `Bill #${bill.bid} Total`,
+        quantity: "", unit_price: "",
+        subtotal: billTotal.toFixed(2),
+        is_total: true
       });
     });
-    allItems.push({
-      product_name: `Bill #${bill.bid} Total`,
-      quantity: "", unit_price: "",
-      subtotal: billTotal.toFixed(2),
-      is_total: true
-    });
-  });
 
-  try {
-    const res = await api.post("/bill/generate_monthly_pdf", {
-      customer: {
-        cname: c.cname, cphone: c.cphone, cmail: c.cmail || "",
-        currently_due_amount: c.currently_due_amount.toFixed(2),
-        last_paid_amount: c.last_paid_amount.toFixed(2),
-      },
-      bills, all_items: allItems,
-      grand_total: realTotal.toFixed(2),
-      generated_date: label,
-      total_bills: bills.length
-    }, { responseType: "blob" });
+    try {
+      const res = await api.post("/bill/generate_monthly_pdf", {
+        customer: {
+          cname: c.cname, cphone: c.cphone, cmail: c.cmail || "",
+          currently_due_amount: c.currently_due_amount.toFixed(2),
+          last_paid_amount: c.last_paid_amount.toFixed(2),
+        },
+        bills, all_items: allItems,
+        grand_total: realTotal.toFixed(2),
+        generated_date: label,
+        total_bills: bills.length
+      }, { responseType: "blob" });
 
-    const url = window.URL.createObjectURL(new Blob([res.data]));
-    const a = document.createElement("a");
-    a.href = url;
-    a.setAttribute("download", `Statement_${c.cname}_${label}.pdf`);
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    window.URL.revokeObjectURL(url);
-  } catch {
-    alert("Failed to generate PDF");
-  }
-};
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const a = document.createElement("a");
+      a.href = url;
+      a.setAttribute("download", `Statement_${c.cname}_${label}.pdf`);
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch {
+      alert("Failed to generate PDF");
+    }
+  };
 
   const handleDeleteMonth = async (key, label) => {
     const confirm1 = window.confirm(
@@ -758,6 +806,16 @@ const handleMonthlyWhatsApp = (key, monthData) => {
                                     <span style={{ fontWeight: "600", color: "#475569" }}>
                                       Rs {item.subtotal.toFixed(2)}
                                     </span>
+                                    <button
+                                      onClick={() => handleDeleteItem(item, bill)}
+                                      style={{
+                                        background: "none", border: "none", cursor: "pointer",
+                                        color: "#dc2626", fontSize: "12px", padding: "2px 4px"
+                                      }}
+                                      title="Delete this item"
+                                    >
+                                      🗑
+                                    </button>
                                   </div>
                                 ))}
                               </div>
@@ -793,7 +851,7 @@ const handleMonthlyWhatsApp = (key, monthData) => {
                                 cursor: "pointer", fontSize: "12px", fontWeight: "700"
                               }}>🗑 Delete {label}</button>
                             )}
-                            
+
                           </div>
                         </div>
                       </div>

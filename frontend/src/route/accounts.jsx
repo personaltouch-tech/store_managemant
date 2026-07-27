@@ -62,55 +62,55 @@ function Accounts() {
       setNotice("Failed to load customer details");
     }
   }
-async function handleDeleteItem(item, bill) {
-  const confirmed = window.confirm(
-    `Delete "${item.product_name} x${item.quantity}" (Rs ${item.subtotal.toFixed(2)}) from Bill #${bill.bid}?\n\nThis will update the bill total and customer due amount.`
-  );
-  if (!confirmed) return;
+  async function handleDeleteItem(item, bill) {
+    const confirmed = window.confirm(
+      `Delete "${item.product_name} x${item.quantity}" (Rs ${item.subtotal.toFixed(2)}) from Bill #${bill.bid}?\n\nThis will update the bill total and customer due amount.`
+    );
+    if (!confirmed) return;
 
-  try {
-    const res = await api.post(`/customer/delete_bill_item/${item.biid}`);
-    const { bill_deleted, new_bill_total, currently_due_amount } = res.data;
+    try {
+      const res = await api.post(`/customer/delete_bill_item/${item.biid}`);
+      const { bill_deleted, new_bill_total, currently_due_amount } = res.data;
 
-    // Update local state in place — no refetch, no flicker
-    setCustomerDetail(prev => {
-      if (!prev) return prev;
+      // Update local state in place — no refetch, no flicker
+      setCustomerDetail(prev => {
+        if (!prev) return prev;
 
-      // Remove the deleted item from BillItems
-      const updatedBillItems = prev.BillItems.filter(i => i.biid !== item.biid);
+        // Remove the deleted item from BillItems
+        const updatedBillItems = prev.BillItems.filter(i => i.biid !== item.biid);
 
-      // Remove or update the bill in CustomerBills
-      const updatedCustomerBills = bill_deleted
-        ? prev.CustomerBills.filter(b => b.bid !== bill.bid)
-        : prev.CustomerBills.map(b =>
+        // Remove or update the bill in CustomerBills
+        const updatedCustomerBills = bill_deleted
+          ? prev.CustomerBills.filter(b => b.bid !== bill.bid)
+          : prev.CustomerBills.map(b =>
             b.bid === bill.bid ? { ...b, total_amount: new_bill_total } : b
           );
 
-      return {
-        ...prev,
-        BillItems: updatedBillItems,
-        CustomerBills: updatedCustomerBills,
-        Customer: {
-          ...prev.Customer,
-          currently_due_amount: currently_due_amount ?? prev.Customer.currently_due_amount
-        }
-      };
-    });
+        return {
+          ...prev,
+          BillItems: updatedBillItems,
+          CustomerBills: updatedCustomerBills,
+          Customer: {
+            ...prev.Customer,
+            currently_due_amount: currently_due_amount ?? prev.Customer.currently_due_amount
+          }
+        };
+      });
 
-    // Update the customer list row (due amount) without reloading the whole table
-    setCustomers(prev =>
-      prev.map(c =>
-        c.cid === selectedCid
-          ? { ...c, currently_due_amount: currently_due_amount ?? c.currently_due_amount }
-          : c
-      )
-    );
+      // Update the customer list row (due amount) without reloading the whole table
+      setCustomers(prev =>
+        prev.map(c =>
+          c.cid === selectedCid
+            ? { ...c, currently_due_amount: currently_due_amount ?? c.currently_due_amount }
+            : c
+        )
+      );
 
-    setNotice("✅ Item deleted and totals updated.");
-  } catch (err) {
-    alert(err?.response?.data?.detail || "Failed to delete item");
+      setNotice("✅ Item deleted and totals updated.");
+    } catch (err) {
+      alert(err?.response?.data?.detail || "Failed to delete item");
+    }
   }
-}
   async function handlePayment() {
     const amount = parseFloat(payAmount);
     if (!amount || amount <= 0) return alert("Enter valid amount");
@@ -550,8 +550,11 @@ async function handleDeleteItem(item, bill) {
           </div>
 
           {/* ── Scrollable table wrapper ── */}
+          {/* ── Scrollable table wrapper ── */}
           <div style={{
             overflowX: "auto",
+            overflowY: "auto",
+            maxHeight: "320px",
             WebkitOverflowScrolling: "touch",
             scrollbarWidth: "thin",
             scrollbarColor: "#cbd5e1 transparent"

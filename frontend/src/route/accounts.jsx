@@ -206,7 +206,7 @@ function Accounts() {
     }
   };
   // ── MONTHLY STATEMENT WHATSAPP ────────────────────────────
-  const handleMonthlyWhatsApp = (key, monthData) => {
+ const handleMonthlyWhatsApp = (key, monthData) => {
     const c = customerDetail.Customer;
     const { label, bills } = monthData;
 
@@ -249,6 +249,8 @@ function Accounts() {
       `${EMOJI.money} Month Total  : *Rs.${realTotal.toFixed(2)}*`,
       `${EMOJI.red} Total Due    : *Rs.${c.currently_due_amount.toFixed(2)}*`,
       LINE,
+      `_Composition Taxable Person, Not Eligible To Collect Tax On Supplies_`,
+      "",
       `${EMOJI.pray} Please clear dues.`,
       `${EMOJI.pin} Gangadhar Provision Store`,
     ].join("\n");

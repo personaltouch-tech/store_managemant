@@ -195,7 +195,7 @@ function Billing() {
   };
 
   // ── WHATSAPP ──────────────────────────────────────────────
-  const handleWhatsApp = async () => {
+const handleWhatsApp = async () => {
     if (!billDone) return;
 
     const date = new Date(billDone.created_at).toLocaleDateString("en-IN", {
@@ -223,6 +223,8 @@ function Billing() {
     msg += `💰 *TOTAL AMOUNT : Rs.${parseFloat(billDone.total_amount).toFixed(2)}*\n`;
     msg += `━━━━━━━━━━━━━━━━━━━━━\n\n`;
 
+    msg += `_Composition Taxable Person, Not Eligible To Collect Tax On Supplies_\n\n`;
+
     if (billDone.paymentType === "Monthly Account") {
       msg += `📌 _Added to your Monthly Account_\n\n`;
     } else {
@@ -238,8 +240,6 @@ function Billing() {
       : `https://wa.me/?text=${encodeURIComponent(msg)}`;
     window.open(waUrl, "_blank");
   };
-
-
   const handleDownloadPDF = async () => {
     if (!billDone) return;
     try {

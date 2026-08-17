@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../api/api";
 import { isValidPhone } from "../utils/validation";
+import { printBill } from "../utils/printer";
 import Header from "../components/Hader";
 import Footer from "../components/Footer";
 import "../style/billing.css";
@@ -22,6 +23,7 @@ function Billing() {
   const [notice, setNotice] = useState("");
   const [billDone, setBillDone] = useState(null);
   const [cashMethod, setCashMethod] = useState("Cash");
+  const [printing, setPrinting] = useState(false);
 
   // ── NEW: view mode toggle (Category Wise / All Products) ──
   const [viewMode, setViewMode] = useState("category"); // "category" | "all"
@@ -204,6 +206,9 @@ const handleWhatsApp = async () => {
 
     let msg = ``;
     msg += `🏪 *GANGADHAR PROVISION STORE*\n`;
+    msg += `📍 1, Ravikunj Flat, Arunodaya Soc., B.M.C. Gas Supply Rd, Alkapuri, Vadodara - 390007\n`;
+    msg += `📞 Mobile: 95860 52965\n`;
+    msg += `🆔 GSTIN: 24ADHPP9881D1Z9\n`;
     msg += `━━━━━━━━━━━━━━━━━━━━━\n\n`;
     msg += `📋 *BILL RECEIPT*\n`;
     msg += `🔖 Bill No : *#${billDone.bid}*\n`;
@@ -272,6 +277,19 @@ const handleWhatsApp = async () => {
       alert("Failed to generate PDF: " + (err?.response?.data?.detail || err.message));
     }
   };
+
+  const handlePrint = async () => {
+    if (!billDone) return;
+    try {
+      setPrinting(true);
+      await printBill(billDone);
+    } catch (err) {
+      alert("Failed to print: " + err.message);
+    } finally {
+      setPrinting(false);
+    }
+  };
+
   const activeCat = categories.find(c => c.cid === activeCategory);
 
   // ── JSX ───────────────────────────────────────────────────
@@ -854,6 +872,13 @@ const handleWhatsApp = async () => {
                 color: "white", border: "none", borderRadius: "8px",
                 cursor: "pointer", fontSize: "13px", fontWeight: "700"
               }}>⬇ PDF</button>
+
+              <button onClick={handlePrint} disabled={printing} style={{
+                flex: 1, minWidth: "120px", padding: "10px 0", backgroundColor: "#2563eb",
+                color: "white", border: "none", borderRadius: "8px",
+                cursor: printing ? "not-allowed" : "pointer", fontSize: "13px", fontWeight: "700",
+                opacity: printing ? 0.7 : 1
+              }}>🖨️ {printing ? "Printing..." : "Print"}</button>
             </div>
 
             <button

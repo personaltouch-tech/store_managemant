@@ -36,6 +36,90 @@
     font-size: 14px;
     font-weight: 600;
     color: #444;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.header-printer-pill {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 6px 4px 12px;
+    background: #f1f6f3;
+    border: 1px solid #e1ebe4;
+    border-radius: 24px;
+    transition: all 0.3s ease;
+}
+
+.printer-status-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    display: inline-block;
+    transition: background-color 0.3s ease;
+}
+
+.printer-status-dot.offline {
+    background-color: #ef4444;
+    box-shadow: 0 0 8px rgba(239, 68, 68, 0.6);
+}
+
+.printer-status-dot.online {
+    background-color: #22c55e;
+    box-shadow: 0 0 8px rgba(34, 197, 94, 0.6);
+    animation: status-pulse 2s infinite;
+}
+
+@keyframes status-pulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7);
+    }
+    70% {
+        box-shadow: 0 0 0 6px rgba(34, 197, 94, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(34, 197, 94, 0);
+    }
+}
+
+.printer-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    border: none;
+    border-radius: 20px;
+    padding: 6px 14px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    color: #ffffff;
+    outline: none;
+}
+
+.printer-btn.disconnected {
+    background-color: #14532d; /* Premium dark green */
+}
+
+.printer-btn.disconnected:hover {
+    background-color: #166534;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 5px rgba(20, 83, 45, 0.2);
+}
+
+.printer-btn.connected {
+    background-color: #dc2626; /* Warning red to disconnect */
+}
+
+.printer-btn.connected:hover {
+    background-color: #b91c1c;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 5px rgba(220, 38, 38, 0.2);
+}
+
+.printer-icon {
+    flex-shrink: 0;
 }
 
 @media (max-width: 760px) {
@@ -68,6 +152,8 @@
     }
     .header-right {
         font-size: 13px;
+        flex-direction: column;
+        gap: 8px;
     }
     .logo {
         width: 48px;

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../api/api";
+import { printBill, printMonthlyStatement } from "../utils/printer";
 import Header from "../components/Hader";
 import Footer from "../components/Footer";
 import "../style/accounts.css";
@@ -15,7 +16,6 @@ function Accounts() {
   const [payAmount, setPayAmount] = useState("");
   const [payLoading, setPayLoading] = useState(false);
   const [notice, setNotice] = useState("");
-  const [loading, setLoading] = useState(true);
 
   // ── MISSING STATES (now fixed) ─────────────────────────────
   const [showAddForm, setShowAddForm] = useState(false);
@@ -28,11 +28,11 @@ function Accounts() {
     return items.reduce((sum, item) => sum + item.subtotal, 0);
   }
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { loadCustomers(); }, []);
 
   async function loadCustomers(type = filterType) {
     try {
-      setLoading(true);
       if (type === "monthly") {
         const res = await api.get("/customer/get_monthly_customers");
         setCustomers(res.data || []);
@@ -47,7 +47,7 @@ function Accounts() {
       }
     } catch {
       setNotice("Failed to load customers");
-    } finally { setLoading(false); }
+    }
   }
 
   async function openCustomer(cid) {
@@ -156,6 +156,9 @@ function Accounts() {
 
     const msg = [
       `${EMOJI.store} *GANGADHAR PROVISION STORE*`,
+      `📍 1, Ravikunj Flat, Arunodaya Soc., B.M.C. Gas Supply Rd, Alkapuri, Vadodara - 390007`,
+      `📞 Mobile: 95860 52965`,
+      `🆔 GSTIN: 24ADHPP9881D1Z9`,
       LINE,
       `${EMOJI.tag} Bill #${bill.bid}  |  ${EMOJI.calendar} ${date}`,
       `${EMOJI.person} ${c.cname}  |  ${EMOJI.card} ${bill.payment_type}`,
@@ -205,6 +208,65 @@ function Accounts() {
       alert("Failed to generate PDF");
     }
   };
+  // ── PRINTER PRINT ──────────────────────────────────────────
+  const handlePrint = async (bill, items) => {
+    const c = customerDetail.Customer;
+    const billTotal = getBillTotal(bill, customerDetail.BillItems);
+    try {
+      const mappedBill = {
+        bid: bill.bid,
+        created_at: bill.created_at,
+        cname: c.cname,
+        phone: c.cphone || "",
+        paymentType: bill.payment_type,
+        total_amount: billTotal,
+        items: items.map(i => ({
+          product_name: i.product_name,
+          quantity: i.quantity,
+          subtotal: i.subtotal,
+          price: i.unit_price,
+        }))
+      };
+      await printBill(mappedBill);
+    } catch (err) {
+      alert("Failed to print: " + err.message);
+    }
+  };
+  // ── PRINTER MONTHLY PRINT ──────────────────────────────────
+  const handlePrintMonthly = async (key, monthData) => {
+    const c = customerDetail.Customer;
+    const { label, bills } = monthData;
+    let realTotal = 0;
+    const mappedBills = bills.map(bill => {
+      const billTotal = getBillTotal(bill, customerDetail.BillItems);
+      realTotal += billTotal;
+      const billItems = customerDetail.BillItems.filter(i => i.bid === bill.bid);
+      return {
+        bid: bill.bid,
+        created_at: bill.created_at,
+        total_amount: billTotal,
+        items: billItems.map(i => ({
+          product_name: i.product_name,
+          quantity: i.quantity,
+          subtotal: i.subtotal,
+          price: i.unit_price,
+        }))
+      };
+    });
+
+    try {
+      const statement = {
+        label,
+        cname: c.cname,
+        phone: c.cphone || "",
+        grand_total: realTotal,
+        bills: mappedBills
+      };
+      await printMonthlyStatement(statement);
+    } catch (err) {
+      alert("Failed to print statement: " + err.message);
+    }
+  };
   // ── MONTHLY STATEMENT WHATSAPP ────────────────────────────
  const handleMonthlyWhatsApp = (key, monthData) => {
     const c = customerDetail.Customer;
@@ -239,6 +301,9 @@ function Accounts() {
 
     const msg = [
       `${EMOJI.store} *GANGADHAR PROVISION STORE*`,
+      `📍 1, Ravikunj Flat, Arunodaya Soc., B.M.C. Gas Supply Rd, Alkapuri, Vadodara - 390007`,
+      `📞 Mobile: 95860 52965`,
+      `🆔 GSTIN: 24ADHPP9881D1Z9`,
       LINE,
       `${EMOJI.chart} *${label} Statement*`,
       `${EMOJI.person} ${c.cname}  |  ${EMOJI.phone} ${c.cphone}`,
@@ -798,6 +863,11 @@ function Accounts() {
                                     borderRadius: "6px", padding: "4px 8px",
                                     cursor: "pointer", fontSize: "11px", fontWeight: "700"
                                   }}>⬇</button>
+                                  <button onClick={() => handlePrint(bill, billItems)} style={{
+                                    backgroundColor: "#2563eb", color: "white", border: "none",
+                                    borderRadius: "6px", padding: "4px 8px",
+                                    cursor: "pointer", fontSize: "11px", fontWeight: "700"
+                                  }}>🖨️</button>
                                 </div>
                               </div>
                               <div style={{ padding: "8px 16px 8px 52px" }}>
@@ -849,6 +919,11 @@ function Accounts() {
                               borderRadius: "6px", padding: "6px 12px",
                               cursor: "pointer", fontSize: "12px", fontWeight: "700"
                             }}>⬇ PDF {label}</button>
+                            <button onClick={() => handlePrintMonthly(key, grouped[key])} style={{
+                              backgroundColor: "#2563eb", color: "white", border: "none",
+                              borderRadius: "6px", padding: "6px 12px",
+                              cursor: "pointer", fontSize: "12px", fontWeight: "700"
+                            }}>🖨️ Print {label}</button>
                             {!isCashCustomer && (
                               <button onClick={() => handleDeleteMonth(key, label)} style={{
                                 backgroundColor: "#7f1d1d", color: "white", border: "none",

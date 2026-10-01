@@ -5,6 +5,7 @@ import { isValidPhone } from "../utils/validation";
 import { printBill } from "../utils/printer";
 import Header from "../components/Hader";
 import Footer from "../components/Footer";
+import ThermalReceiptModal from "../components/ThermalReceiptModal";
 import "../style/billing.css";
 
 function Billing() {
@@ -24,6 +25,7 @@ function Billing() {
   const [billDone, setBillDone] = useState(null);
   const [cashMethod, setCashMethod] = useState("Cash");
   const [printing, setPrinting] = useState(false);
+  const [showThermalReceipt, setShowThermalReceipt] = useState(false);
 
   // ── NEW: view mode toggle (Category Wise / All Products) ──
   const [viewMode, setViewMode] = useState("category"); // "category" | "all"
@@ -859,8 +861,8 @@ const handleWhatsApp = async () => {
               </div>
             )}
 
-            {/* 3 Share Buttons */}
-            <div style={{ display: "flex", gap: "8px", marginBottom: "12px", flexWrap: "wrap" }}>
+            {/* Action Buttons */}
+            <div style={{ display: "flex", gap: "8px", marginBottom: "8px", flexWrap: "wrap" }}>
               <button onClick={handleWhatsApp} style={{
                 flex: 1, minWidth: "120px", padding: "10px 0", backgroundColor: "#16a34a",
                 color: "white", border: "none", borderRadius: "8px",
@@ -872,17 +874,28 @@ const handleWhatsApp = async () => {
                 color: "white", border: "none", borderRadius: "8px",
                 cursor: "pointer", fontSize: "13px", fontWeight: "700"
               }}>⬇ PDF</button>
+            </div>
 
+            <div style={{ display: "flex", gap: "8px", marginBottom: "12px", flexWrap: "wrap" }}>
               <button onClick={handlePrint} disabled={printing} style={{
                 flex: 1, minWidth: "120px", padding: "10px 0", backgroundColor: "#2563eb",
                 color: "white", border: "none", borderRadius: "8px",
                 cursor: printing ? "not-allowed" : "pointer", fontSize: "13px", fontWeight: "700",
                 opacity: printing ? 0.7 : 1
               }}>🖨️ {printing ? "Printing..." : "Print"}</button>
+
+              <button onClick={() => setShowThermalReceipt(true)} style={{
+                flex: 1, minWidth: "120px", padding: "10px 0", backgroundColor: "#0f766e",
+                color: "white", border: "none", borderRadius: "8px",
+                cursor: "pointer", fontSize: "13px", fontWeight: "700"
+              }}>🧾 Show Receipt</button>
             </div>
 
             <button
-              onClick={() => setBillDone(null)}
+              onClick={() => {
+                setBillDone(null);
+                setShowThermalReceipt(false);
+              }}
 
               style={{
                 width: "100%", padding: "11px 0",
@@ -893,6 +906,14 @@ const handleWhatsApp = async () => {
             >+ New Bill</button>
           </div>
         </div>
+      )}
+
+      {/* Thermal Receipt Print Look Modal */}
+      {showThermalReceipt && billDone && (
+        <ThermalReceiptModal
+          bill={billDone}
+          onClose={() => setShowThermalReceipt(false)}
+        />
       )}
     </div>
   );

@@ -16,7 +16,7 @@ B.M.C. Gas Supply Road, Alkapuri,
 
 Vadodara - 7"""
 STORE_PHONE   = "Mobile: 95860 52965"
-STORE_GSTIN   = "GSTIN: 24ADHPP9881D1Z9"
+STORE_GSTIN   = "GSTIN: 24ADHPP8981D1Z9"
 LOGO_PATH     = "static/logo.png"
 
 DARK_BLUE  = colors.HexColor("#1e3a5f")

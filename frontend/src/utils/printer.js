@@ -163,7 +163,7 @@ export function createReceiptData(bill) {
     lines.push(encoder.encode("B.M.C. Gas Supply Rd, Alkapuri\n"));
     lines.push(encoder.encode("Vadodara - 390007\n"));
     lines.push(encoder.encode("Mobile: 95860 52965\n"));
-    lines.push(encoder.encode("GSTIN: 24ADHPP9881D1Z9\n"));
+    lines.push(encoder.encode("GSTIN: 24ADHPP8981D1Z9\n"));
     lines.push(encoder.encode("--------------------------------\n"));
     lines.push(new Uint8Array([ESC, 0x61, 0x00]));
     lines.push(encoder.encode(`Bill No : #${bill.bid}\n`));
@@ -189,8 +189,13 @@ export function createReceiptData(bill) {
     lines.push(encoder.encode(
         `TOTAL: Rs.${parseFloat(bill.total_amount).toFixed(2)}\n`
     ));
-    lines.push(new Uint8Array([ESC, 0x21, 0x00]));
     lines.push(encoder.encode("--------------------------------\n"));
+
+    lines.push(new Uint8Array([ESC, 0x21, 0x08])); // Bold
+    lines.push(encoder.encode("Composition Taxable Person,\n"));
+    lines.push(encoder.encode("Not Eligible To Collect Tax On Supplies\n"));
+    lines.push(new Uint8Array([ESC, 0x21, 0x00])); // Normal
+
     lines.push(new Uint8Array([ESC, 0x61, 0x01]));
     lines.push(encoder.encode("Thank You! Visit Again\n"));
     lines.push(new Uint8Array([ESC, 0x64, 0x05]));
@@ -213,14 +218,14 @@ export function createMonthlyStatementReceiptData(statement) {
 
     // Initialize printer
     lines.push(new Uint8Array([ESC, 0x40]));
-    
+
     // Justify center
     lines.push(new Uint8Array([ESC, 0x61, 0x01]));
-    
+
     // Double size
     lines.push(new Uint8Array([ESC, 0x21, 0x30]));
     lines.push(encoder.encode("GANGADHAR PROVISION STORE\n"));
-    
+
     // Normal size
     lines.push(new Uint8Array([ESC, 0x21, 0x00]));
     lines.push(encoder.encode("1, Ravikunj Flat, Arunodaya Soc.\n"));
@@ -229,18 +234,18 @@ export function createMonthlyStatementReceiptData(statement) {
     lines.push(encoder.encode("Mobile: 95860 52965\n"));
     lines.push(encoder.encode("GSTIN: 24ADHPP9881D1Z9\n"));
     lines.push(encoder.encode("--------------------------------\n"));
-    
+
     // Title
     lines.push(new Uint8Array([ESC, 0x21, 0x08])); // Bold
     lines.push(encoder.encode("MONTHLY STATEMENT\n"));
     lines.push(new Uint8Array([ESC, 0x21, 0x00])); // Normal
-    
+
     lines.push(new Uint8Array([ESC, 0x61, 0x00])); // Justify left
     lines.push(encoder.encode(`Month   : ${statement.label}\n`));
     lines.push(encoder.encode(`Customer: ${statement.cname}\n`));
     lines.push(encoder.encode(`Phone   : ${statement.phone || "-"}\n`));
     lines.push(encoder.encode("--------------------------------\n"));
-    
+
     lines.push(new Uint8Array([ESC, 0x21, 0x08])); // Bold header
     lines.push(encoder.encode("Item            Qty    Amount\n"));
     lines.push(new Uint8Array([ESC, 0x21, 0x00]));
@@ -252,14 +257,14 @@ export function createMonthlyStatementReceiptData(statement) {
         const dateStr = new Date(bill.created_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short" });
         lines.push(encoder.encode(`-- Bill #${bill.bid} (${dateStr}) --\n`));
         lines.push(new Uint8Array([ESC, 0x21, 0x00])); // Normal
-        
+
         bill.items.forEach(item => {
             const name = item.product_name.substring(0, 14).padEnd(14);
             const qty = String(item.quantity).padStart(3);
             const amount = `Rs.${item.subtotal.toFixed(2)}`.padStart(9);
             lines.push(encoder.encode(`${name} ${qty} ${amount}\n`));
         });
-        
+
         // Print bill subtotal
         const subtotalStr = `Rs.${bill.total_amount.toFixed(2)}`;
         lines.push(encoder.encode(`Subtotal: ${subtotalStr.padStart(22)}\n`));
@@ -267,14 +272,20 @@ export function createMonthlyStatementReceiptData(statement) {
     });
 
     lines.push(encoder.encode("--------------------------------\n"));
-    
+
     lines.push(new Uint8Array([ESC, 0x61, 0x01])); // Centered
     lines.push(new Uint8Array([ESC, 0x21, 0x18])); // Double height bold
     lines.push(encoder.encode(`TOTAL: Rs.${parseFloat(statement.grand_total).toFixed(2)}\n`));
-    
+
     lines.push(new Uint8Array([ESC, 0x21, 0x00])); // Normal
     lines.push(encoder.encode("--------------------------------\n"));
-    lines.push(new Uint8Array([ESC, 0x61, 0x01])); // Justify center
+
+    lines.push(new Uint8Array([ESC, 0x21, 0x08])); // Bold
+    lines.push(encoder.encode("Composition Taxable Person,\n"));
+    lines.push(encoder.encode("Not Eligible To Collect Tax On Supplies\n"));
+    lines.push(new Uint8Array([ESC, 0x21, 0x00])); // Normal
+
+    lines.push(new Uint8Array([ESC, 0x61, 0x01]));
     lines.push(encoder.encode("Thank You! Visit Again\n"));
     lines.push(new Uint8Array([ESC, 0x64, 0x05])); // Feed lines
     lines.push(new Uint8Array([GS, 0x56, 0x41, 0x10])); // Cut

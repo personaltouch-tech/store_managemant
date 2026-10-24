@@ -13,8 +13,6 @@ function Categories() {
   const [form, setForm]             = useState({ cname: "", description: "" });
   const [loading, setLoading]       = useState(false);
 
-  useEffect(() => { fetchCategories(); }, []);
-
   const fetchCategories = async () => {
     try {
       const res = await api.get("/categories/get_category");
@@ -23,6 +21,8 @@ function Categories() {
       alert("Failed to load categories");
     }
   };
+
+  useEffect(() => { fetchCategories(); }, []);
 
   const openAdd = () => {
     setEditItem(null);

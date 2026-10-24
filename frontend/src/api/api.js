@@ -1,11 +1,10 @@
 import axios from "axios";
 
 const api = axios.create({
-    baseURL: "https://storemanagemant-production.up.railway.app",
+    baseURL: import.meta.env.VITE_API_URL || (typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")
+        ? "http://127.0.0.1:8000"
+        : "https://storemanagemant-production.up.railway.app"),
 });
-// const api = axios.create({
-//     baseURL: "http://127.0.0.1:8000",
-// });
 
 api.interceptors.request.use(config => {
     const token = sessionStorage.getItem("token"); // ← changed

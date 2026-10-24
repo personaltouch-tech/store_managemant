@@ -88,7 +88,7 @@ function AddCustomer() {
     setSuccess("");
     
     try {
-      const response = await api.post("/customer/create_customer", {
+      await api.post("/customer/create_customer", {
         cname: form.cname.trim(),
         cphone: form.cphone,
         cmail: form.cmail.trim(),

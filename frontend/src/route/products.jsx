@@ -14,6 +14,7 @@ function Products() {
   const [allProducts, setAllProducts]   = useState([]);
   const [activeCategory, setActiveCategory] = useState(null);
   const [searches, setSearches]         = useState({});
+  const [categorySearch, setCategorySearch] = useState("");
   const [quantities, setQuantities]     = useState({});
   const [showModal, setShowModal]       = useState(false);
   const [editItem, setEditItem]         = useState(null);
@@ -23,12 +24,27 @@ function Products() {
   const [showCamera, setShowCamera]     = useState(false);
   const [cameraError, setCameraError]   = useState("");
   const [form, setForm] = useState({
-    product_name: "", cid: "", unit: "" || 0, price: ""
+    product_name: "", cid: "", unit: "", price: ""
   });
 
   const videoRef  = useRef(null);
   const canvasRef = useRef(null);
   const streamRef = useRef(null);
+
+  const fetchCategories = async () => {
+    try {
+      const res = await api.get("/categories/get_category");
+      setCategories(res.data);
+      if (res.data.length > 0) setActiveCategory(res.data[0].cid);
+    } catch { alert("Failed to load categories"); }
+  };
+
+  const fetchProducts = async () => {
+    try {
+      const res = await api.get("/products/get_products");
+      setAllProducts(res.data);
+    } catch { alert("Failed to load products"); }
+  };
 
   useEffect(() => { fetchCategories(); fetchProducts(); }, []);
 
@@ -48,21 +64,6 @@ function Products() {
     };
   }, []);
 
-  const fetchCategories = async () => {
-    try {
-      const res = await api.get("/categories/get_category");
-      setCategories(res.data);
-      if (res.data.length > 0) setActiveCategory(res.data[0].cid);
-    } catch { alert("Failed to load categories"); }
-  };
-
-  const fetchProducts = async () => {
-    try {
-      const res = await api.get("/products/get_products");
-      setAllProducts(res.data);
-    } catch { alert("Failed to load products"); }
-  };
-
   const getProductsByCategory = (cid) =>
     allProducts.filter((p) => p.cid === cid);
 
@@ -72,6 +73,10 @@ function Products() {
       p.product_name.toLowerCase().includes(search.toLowerCase())
     );
   };
+
+  const filteredCategories = categories.filter((cat) =>
+    cat.cname.toLowerCase().includes(categorySearch.toLowerCase().trim())
+  );
 
   const getTotalSelected = (cid) =>
     getProductsByCategory(cid).reduce(
@@ -113,7 +118,7 @@ function Products() {
       });
       streamRef.current = stream;
       setShowCamera(true);
-    } catch (err) {
+    } catch {
       setCameraError(
         "Could not open the camera. Please allow camera access, or choose a photo from your gallery instead."
       );
@@ -258,30 +263,91 @@ function Products() {
         </div>
       </div>
 
+      {/* Category Section Header & Search */}
+      <div style={styles.catHeaderRow}>
+        <div style={styles.catHeaderLeft}>
+          <span style={styles.catSectionTitle}>Categories</span>
+          <span style={styles.catCountBadge}>
+            {filteredCategories.length} {filteredCategories.length === 1 ? "category" : "categories"}
+          </span>
+        </div>
+        <div style={styles.catSearchWrapper}>
+          <svg
+            style={styles.catSearchIcon}
+            width="15"
+            height="15"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="#64748b"
+            strokeWidth="2.2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <circle cx="11" cy="11" r="8" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </svg>
+          <input
+            type="text"
+            placeholder="Search categories..."
+            value={categorySearch}
+            onChange={(e) => setCategorySearch(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && filteredCategories.length > 0) {
+                setActiveCategory(filteredCategories[0].cid);
+              }
+            }}
+            style={styles.catSearchInput}
+          />
+          {categorySearch && (
+            <button
+              type="button"
+              onClick={() => setCategorySearch("")}
+              style={styles.catClearBtn}
+              title="Clear search"
+            >
+              ✕
+            </button>
+          )}
+        </div>
+      </div>
+
       {/* Category Cards */}
       <div style={{ ...styles.cardGrid, overflowX: "auto", paddingBottom: "8px" }}>
-        {categories.map((cat) => {
-          const selected = getTotalSelected(cat.cid);
-          const isActive = activeCategory === cat.cid;
-          return (
-            <div
-              key={cat.cid}
-              onClick={() => setActiveCategory(isActive ? null : cat.cid)}
-              style={{ ...styles.catCard, ...(isActive ? styles.catCardActive : {}) }}
+        {filteredCategories.length === 0 ? (
+          <div style={styles.noCategoriesMsg}>
+            <span>No category matching &quot;{categorySearch}&quot;</span>
+            <button
+              type="button"
+              onClick={() => setCategorySearch("")}
+              style={styles.clearFilterBtn}
             >
-              <div style={styles.catIcon}>
-                {cat.cname.charAt(0).toUpperCase()}
+              Clear filter
+            </button>
+          </div>
+        ) : (
+          filteredCategories.map((cat) => {
+            const selected = getTotalSelected(cat.cid);
+            const isActive = activeCategory === cat.cid;
+            return (
+              <div
+                key={cat.cid}
+                onClick={() => setActiveCategory(isActive ? null : cat.cid)}
+                style={{ ...styles.catCard, ...(isActive ? styles.catCardActive : {}) }}
+              >
+                <div style={styles.catIcon}>
+                  {cat.cname.charAt(0).toUpperCase()}
+                </div>
+                <div style={styles.catCardName}>{cat.cname}</div>
+                <div style={styles.catCardCount}>
+                  {getProductsByCategory(cat.cid).length} items
+                </div>
+                {selected > 0 && (
+                  <div style={styles.selectedBadge}>{selected}</div>
+                )}
               </div>
-              <div style={styles.catCardName}>{cat.cname}</div>
-              <div style={styles.catCardCount}>
-                {getProductsByCategory(cat.cid).length} items
-              </div>
-              {selected > 0 && (
-                <div style={styles.selectedBadge}>{selected}</div>
-              )}
-            </div>
-          );
-        })}
+            );
+          })
+        )}
       </div>
 
       {/* Product Section */}
@@ -486,16 +552,42 @@ function Products() {
 const styles = {
   page:             { padding: "24px", backgroundColor: "#f8fafc", minHeight: "100vh" },
   header:           { display: "flex", justifyContent: "space-between",
-                      alignItems: "flex-start", marginBottom: "24px" },
+                      alignItems: "flex-start", marginBottom: "18px" },
   title:            { margin: 0, fontSize: "22px", fontWeight: "700", color: "#1e293b" },
   subtitle:         { margin: "4px 0 0", fontSize: "13px", color: "#64748b" },
   addBtn:           { padding: "10px 20px", backgroundColor: "#2563eb", color: "white",
                       border: "none", borderRadius: "8px", cursor: "pointer",
                       fontSize: "14px", fontWeight: "600" },
+  catHeaderRow:     { display: "flex", justifyContent: "space-between",
+                      alignItems: "center", marginBottom: "12px",
+                      flexWrap: "wrap", gap: "10px" },
+  catHeaderLeft:    { display: "flex", alignItems: "center", gap: "10px" },
+  catSectionTitle:  { fontSize: "15px", fontWeight: "700", color: "#1e293b" },
+  catCountBadge:    { fontSize: "12px", color: "#475569", backgroundColor: "#e2e8f0",
+                      padding: "3px 10px", borderRadius: "20px", fontWeight: "600" },
+  catSearchWrapper: { display: "flex", alignItems: "center", backgroundColor: "white",
+                      border: "1px solid #cbd5e1", borderRadius: "8px",
+                      padding: "0 10px", width: "100%", maxWidth: "260px",
+                      boxShadow: "0 1px 3px rgba(0,0,0,0.04)" },
+  catSearchIcon:    { flexShrink: 0, marginRight: "6px" },
+  catSearchInput:   { border: "none", outline: "none", padding: "8px 0",
+                      fontSize: "13px", width: "100%", color: "#1e293b",
+                      backgroundColor: "transparent" },
+  catClearBtn:      { background: "none", border: "none", color: "#94a3b8",
+                      cursor: "pointer", fontSize: "13px", padding: "4px",
+                      display: "flex", alignItems: "center", justifyContent: "center" },
+  noCategoriesMsg:  { display: "flex", alignItems: "center", gap: "12px",
+                      padding: "16px 20px", backgroundColor: "white",
+                      borderRadius: "10px", border: "1px dashed #cbd5e1",
+                      width: "100%", minWidth: "280px", color: "#64748b", fontSize: "13px" },
+  clearFilterBtn:   { padding: "4px 10px", backgroundColor: "#eff6ff",
+                      color: "#2563eb", border: "1px solid #bfdbfe",
+                      borderRadius: "6px", fontSize: "12px",
+                      fontWeight: "600", cursor: "pointer" },
   cardGrid:         { display: "flex", flexWrap: "nowrap", gap: "14px", marginBottom: "28px",
                       overflowX: "auto", overflowY: "hidden", WebkitOverflowScrolling: "touch",
                       paddingBottom: "8px", minWidth: 0 },
-  catCard:          { width: "130px", padding: "16px 12px", backgroundColor: "white",
+  catCard:          { width: "130px", flexShrink: 0, padding: "16px 12px", backgroundColor: "white",
                       borderRadius: "12px", border: "2px solid #e2e8f0",
                       cursor: "pointer", textAlign: "center",
                       boxShadow: "0 1px 4px rgba(0,0,0,0.06)", position: "relative" },

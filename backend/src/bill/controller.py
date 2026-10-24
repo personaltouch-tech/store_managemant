@@ -1,3 +1,4 @@
+from fastapi import HTTPException
 from src.bill.dtos import createBillItemSchema, createBillSchema
 from sqlalchemy.orm import Session
 from src.customer.model import customer
@@ -77,13 +78,19 @@ def getAllBill(db: Session):
 
 def getBill(bill_id: int, db: Session):
     get_bill = (
-        db.query(customer.cname, bill)
-        .join(customer, customer.cid == bill.cid)
+        db.query(customer.cname, customer.cphone, bill)
+        .outerjoin(customer, customer.cid == bill.cid)
         .filter(bill.bid == bill_id)
         .first()
     )
+    if not get_bill:
+        raise HTTPException(404, detail="Bill not found")
+
+    cname = get_bill.cname if get_bill.cname else "Cash Customer"
+    cphone = get_bill.cphone if get_bill.cphone else ""
     return {
-        "cname": get_bill.cname,
+        "cname": cname,
+        "cphone": cphone,
         "bid": get_bill.bill.bid,
         "cid": get_bill.bill.cid,
         "total_amount": get_bill.bill.total_amount,

@@ -1,6 +1,7 @@
-from pydantic import BaseModel,EmailStr
+from typing import Optional
 from decimal import Decimal
 from datetime import datetime
+from pydantic import BaseModel, EmailStr
 
 class createBillItemSchema(BaseModel):
     bid: int
@@ -30,6 +31,7 @@ class getAllBillResponseSchema(BaseModel):
 
 class getBillResponseSchema(BaseModel):
     cname: str
+    cphone: Optional[str] = ""
     bid: int
     cid: int
     total_amount: Decimal

@@ -13,8 +13,6 @@ function PaymentHistory() {
   const [loading, setLoading]         = useState(true);
   const [histLoading, setHistLoading] = useState(false);
 
-  useEffect(() => { loadCustomers(); }, []);
-
   async function loadCustomers() {
     try {
       setLoading(true);
@@ -24,6 +22,8 @@ function PaymentHistory() {
       alert("Failed to load history");
     } finally { setLoading(false); }
   }
+
+  useEffect(() => { loadCustomers(); }, []);
 
   async function openHistory(cid, cname) {
     setSelectedCid(cid);

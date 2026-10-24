@@ -31,14 +31,10 @@ const PrinterIcon = () => (
 
 function Header() {
   const navigate = useNavigate();
-  const [connected, setConnected] = useState(false);
-  const [printerName, setPrinterName] = useState(null);
+  const [connected, setConnected] = useState(() => isPrinterConnected());
+  const [printerName, setPrinterName] = useState(() => getPrinterName());
 
   useEffect(() => {
-    // Sync initial state
-    setConnected(isPrinterConnected());
-    setPrinterName(getPrinterName());
-
     // Try auto-reconnect on mount
     reconnectPrinter().then(() => {
       setConnected(isPrinterConnected());

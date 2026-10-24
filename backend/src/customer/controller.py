@@ -6,15 +6,20 @@ from src.bill.model import bill, bill_items
 from src.products.model import products
 
 def createCustomer(body: createCustomerSchema, db: Session):
-    existing_customer = db.query(customer).filter(customer.cphone == str(body.cphone), customer.cname != "Cash Customer").first()
-    if existing_customer:
-        raise HTTPException(400, detail="Customer is already existing")
+    phone_str = str(body.cphone).strip() if body.cphone else ""
+    if phone_str and body.cname != "Cash Customer":
+        existing_customer = db.query(customer).filter(
+            customer.cphone == phone_str,
+            customer.cname != "Cash Customer"
+        ).first()
+        if existing_customer:
+            raise HTTPException(400, detail="Customer is already existing")
     new_Customer = customer(
         cname=body.cname,
-        cphone=body.cphone,
-        cmail=body.cmail,
-        currently_due_amount=body.currently_due_amount,
-        last_paid_amount=body.last_paid_amount
+        cphone=phone_str,
+        cmail=body.cmail or "",
+        currently_due_amount=body.currently_due_amount or 0,
+        last_paid_amount=body.last_paid_amount or 0
     )
     db.add(new_Customer)
     db.commit()

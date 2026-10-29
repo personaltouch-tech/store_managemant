@@ -3,7 +3,7 @@ name: Daily Backup to Google Drive
 
 on:
   schedule:
-    # Runs daily at 05:30 IST
+    # Every day at 00:00 UTC = 05:30 AM IST
     - cron: "0 0 * * *"
   workflow_dispatch:
 
@@ -12,26 +12,53 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # --------------------------------------------------
+      # 1. Install PostgreSQL 18 client and ZIP utilities
+      # --------------------------------------------------
       - name: Install PostgreSQL 18 client and ZIP
+        shell: bash
         run: |
           set -euo pipefail
+
           sudo apt-get update
-          sudo apt-get install -y curl ca-certificates zip
+          sudo apt-get install -y curl ca-certificates zip unzip
 
           sudo install -d /usr/share/postgresql-common/pgdg
+
           sudo curl --fail --location \
             -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
             https://www.postgresql.org/media/keys/ACCC4CF8.asc
 
-          CODENAME=$(. /etc/os-release && echo "$VERSION_CODENAME")
-          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt ${CODENAME}-pgdg main" \
-            | sudo tee /etc/apt/sources.list.d/pgdg.list
+          . /etc/os-release
+
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt ${VERSION_CODENAME}-pgdg main" \
+            | sudo tee /etc/apt/sources.list.d/pgdg.list > /dev/null
 
           sudo apt-get update
           sudo apt-get install -y postgresql-client-18
-          pg_dump --version
 
+          # Use PostgreSQL 18 explicitly, not the runner's default client.
+          /usr/lib/postgresql/18/bin/pg_dump --version
+          /usr/lib/postgresql/18/bin/psql --version
+
+      # --------------------------------------------------
+      # 2. Install rclone
+      # --------------------------------------------------
+      - name: Install rclone
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          curl --proto '=https' --tlsv1.2 -fsSL \
+            https://rclone.org/install.sh | sudo bash
+
+          rclone version
+
+      # --------------------------------------------------
+      # 3. Configure Google Drive
+      # --------------------------------------------------
       - name: Configure Google Drive
+        shell: bash
         env:
           RCLONE_CLIENT_ID: ${{ secrets.RCLONE_CLIENT_ID }}
           RCLONE_CLIENT_SECRET: ${{ secrets.RCLONE_CLIENT_SECRET }}
@@ -39,98 +66,189 @@ jobs:
           GDRIVE_FOLDER_ID: ${{ secrets.GDRIVE_FOLDER_ID }}
         run: |
           set -euo pipefail
-          mkdir -p ~/.config/rclone
 
-          cat > ~/.config/rclone/rclone.conf <<EOF
-          [gdrive]
-          type = drive
-          scope = drive
-          client_id = ${RCLONE_CLIENT_ID}
-          client_secret = ${RCLONE_CLIENT_SECRET}
-          token = ${RCLONE_TOKEN}
-          root_folder_id = ${GDRIVE_FOLDER_ID}
-          EOF
+          for name in \
+            RCLONE_CLIENT_ID \
+            RCLONE_CLIENT_SECRET \
+            RCLONE_TOKEN
+          do
+            if [[ -z "${!name:-}" ]]; then
+              echo "Missing required GitHub secret: $name"
+              exit 1
+            fi
+          done
 
-          chmod 600 ~/.config/rclone/rclone.conf
+          mkdir -p "$HOME/.config/rclone"
 
-      - name: Verify database and show row counts
+          {
+            printf '[gdrive]\n'
+            printf 'type = drive\n'
+            printf 'scope = drive\n'
+            printf 'client_id = %s\n' "$RCLONE_CLIENT_ID"
+            printf 'client_secret = %s\n' "$RCLONE_CLIENT_SECRET"
+            printf 'token = %s\n' "$RCLONE_TOKEN"
+
+            if [[ -n "${GDRIVE_FOLDER_ID:-}" ]]; then
+              printf 'root_folder_id = %s\n' "$GDRIVE_FOLDER_ID"
+            fi
+          } > "$HOME/.config/rclone/rclone.conf"
+
+          chmod 600 "$HOME/.config/rclone/rclone.conf"
+
+          rclone listremotes
+
+      # --------------------------------------------------
+      # 4. Verify the correct database and row counts
+      # --------------------------------------------------
+      - name: Verify Railway database and row counts
+        shell: bash
         env:
           DATABASE_URL: ${{ secrets.RAILWAY_DATABASE_URL }}
         run: |
           set -euo pipefail
 
-          if [ -z "${DATABASE_URL:-}" ]; then
-            echo "RAILWAY_DATABASE_URL secret is missing."
+          if [[ -z "${DATABASE_URL:-}" ]]; then
+            echo "GitHub secret RAILWAY_DATABASE_URL is missing."
             exit 1
           fi
 
-          psql "$DATABASE_URL" --no-password \
-            -v ON_ERROR_STOP=1 \
-            -c "SELECT current_database() AS database_name;"
+          PG_BIN="/usr/lib/postgresql/18/bin"
 
-          psql "$DATABASE_URL" --no-password \
+          echo "Connected database information:"
+
+          "$PG_BIN/psql" \
+            --no-password \
+            "$DATABASE_URL" \
+            -v ON_ERROR_STOP=1 \
+            -c "SELECT current_database() AS database_name, current_user AS database_user;"
+
+          echo "Exact row counts for application tables:"
+
+          "$PG_BIN/psql" \
+            --no-password \
+            "$DATABASE_URL" \
             -v ON_ERROR_STOP=1 \
             -c "
-              SELECT table_name, row_count
-              FROM (
-                SELECT 'bill'::text AS table_name, COUNT(*) AS row_count
-                  FROM public.bill
-                UNION ALL
-                SELECT 'bill_items', COUNT(*) FROM public.bill_items
-                UNION ALL
-                SELECT 'customer', COUNT(*) FROM public.customer
-                UNION ALL
-                SELECT 'products', COUNT(*) FROM public.products
-              ) AS counts
+              SELECT 'admin' AS table_name, COUNT(*) AS row_count
+                FROM public.admin
+              UNION ALL
+              SELECT 'bill', COUNT(*) FROM public.bill
+              UNION ALL
+              SELECT 'bill_items', COUNT(*) FROM public.bill_items
+              UNION ALL
+              SELECT 'categories', COUNT(*) FROM public.categories
+              UNION ALL
+              SELECT 'customer', COUNT(*) FROM public.customer
+              UNION ALL
+              SELECT 'otp_verifications', COUNT(*) FROM public.otp_verifications
+              UNION ALL
+              SELECT 'payment_history', COUNT(*) FROM public.payment_history
+              UNION ALL
+              SELECT 'products', COUNT(*) FROM public.products
               ORDER BY table_name;
             "
 
+      # --------------------------------------------------
+      # 5. Dump the complete database
+      # --------------------------------------------------
       - name: Dump the entire PostgreSQL database
+        shell: bash
         env:
           DATABASE_URL: ${{ secrets.RAILWAY_DATABASE_URL }}
         run: |
           set -euo pipefail
 
-          pg_dump "$DATABASE_URL" \
+          PG_DUMP="/usr/lib/postgresql/18/bin/pg_dump"
+
+          echo "Using the correct PostgreSQL client:"
+          "$PG_DUMP" --version
+
+          # Full database dump: schema, all rows, sequences and constraints.
+          # There is NO date filter and no table restriction.
+          "$PG_DUMP" "$DATABASE_URL" \
             --no-password \
             --format=plain \
             --no-owner \
             --no-privileges \
             --file=database_backup.sql
 
-          test -s database_backup.sql
-          echo "Full database dump created successfully."
+          if [[ ! -s database_backup.sql ]]; then
+            echo "The SQL backup is missing or empty."
+            exit 1
+          fi
+
+          if ! grep -Fq "PostgreSQL database dump complete" database_backup.sql; then
+            echo "The SQL dump did not finish as expected."
+            exit 1
+          fi
+
+          echo "Complete database dump created successfully."
           du -h database_backup.sql
 
+      # --------------------------------------------------
+      # 6. Create a ZIP containing the SQL backup only
+      # --------------------------------------------------
       - name: Create dated backup ZIP
+        shell: bash
         run: |
           set -euo pipefail
 
-          DATE=$(date -u +%Y-%m-%d)
+          DATE="$(date -u +%Y-%m-%d)"
           BACKUP_FILE="store_managemant_backup_${DATE}.zip"
 
-          # Archive only the database dump, not the application repository.
           zip -j "$BACKUP_FILE" database_backup.sql
           unzip -t "$BACKUP_FILE"
 
           echo "BACKUP_FILE=${BACKUP_FILE}" >> "$GITHUB_ENV"
 
+          echo "Backup archive created:"
+          ls -lh "$BACKUP_FILE"
+
+      # --------------------------------------------------
+      # 7. Upload the ZIP to Google Drive
+      # --------------------------------------------------
       - name: Upload backup to Google Drive
+        shell: bash
         run: |
           set -euo pipefail
-          rclone copy "${BACKUP_FILE}" gdrive:/
-          echo "Backup uploaded: ${BACKUP_FILE}"
 
+          rclone copy "$BACKUP_FILE" "gdrive:/" \
+            --transfers 1 \
+            --checkers 4
+
+          echo "Verifying uploaded backup..."
+
+          rclone lsf "gdrive:/" --files-only \
+            | grep -Fx "$BACKUP_FILE"
+
+          echo "Backup uploaded and verified successfully."
+
+      # --------------------------------------------------
+      # 8. Delete only old matching backup ZIP files
+      # --------------------------------------------------
       - name: Delete backups older than 30 days
+        shell: bash
         run: |
           set -euo pipefail
-          rclone delete gdrive:/ \
+
+          rclone delete "gdrive:/" \
             --min-age 30d \
-            --include 'store_managemant_backup_*.zip'
+            --include "store_managemant_backup_*.zip"
 
+          echo "Removed matching backup ZIP files older than 30 days."
+
+      # --------------------------------------------------
+      # 9. Show the remaining backup count
+      # --------------------------------------------------
       - name: Show remaining backup count
+        shell: bash
         run: |
-          COUNT=$(rclone lsf gdrive:/ --files-only \
-            --include 'store_managemant_backup_*.zip' | wc -l)
+          set -euo pipefail
 
-          echo "Total retained backups: ${COUNT}"
+          COUNT="$(
+            rclone lsf "gdrive:/" --files-only \
+              --include "store_managemant_backup_*.zip" \
+              | wc -l
+          )"
+
+          echo "Total retained backup ZIP files: ${COUNT}"

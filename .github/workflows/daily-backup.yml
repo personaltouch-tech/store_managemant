@@ -1,76 +1,136 @@
+
 name: Daily Backup to Google Drive
+
 on:
   schedule:
-    - cron: '0 0 * * *'
+    # Runs daily at 05:30 IST
+    - cron: "0 0 * * *"
   workflow_dispatch:
 
 jobs:
   backup:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Install rclone
-        run: curl https://rclone.org/install.sh | sudo bash
-
-      - name: Configure rclone
+      - name: Install PostgreSQL 18 client and ZIP
         run: |
-          mkdir -p ~/.config/rclone
-          cat > ~/.config/rclone/rclone.conf << EOF
-          [gdrive]
-          type = drive
-          scope = drive
-          client_id = ${{ secrets.RCLONE_CLIENT_ID }}
-          client_secret = ${{ secrets.RCLONE_CLIENT_SECRET }}
-          token = ${{ secrets.RCLONE_TOKEN }}
-          root_folder_id = ${{ secrets.GDRIVE_FOLDER_ID }}
-          EOF
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y curl ca-certificates zip
 
-      - name: Install PostgreSQL 18 client
-        run: |
-          sudo apt-get install -y curl ca-certificates
           sudo install -d /usr/share/postgresql-common/pgdg
-          sudo curl -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc --fail https://www.postgresql.org/media/keys/ACCC4CF8.asc
-          sudo sh -c 'echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt noble-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+          sudo curl --fail --location \
+            -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
+            https://www.postgresql.org/media/keys/ACCC4CF8.asc
+
+          CODENAME=$(. /etc/os-release && echo "$VERSION_CODENAME")
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt ${CODENAME}-pgdg main" \
+            | sudo tee /etc/apt/sources.list.d/pgdg.list
+
           sudo apt-get update
           sudo apt-get install -y postgresql-client-18
           pg_dump --version
 
-      - name: Dump PostgreSQL Database
+      - name: Configure Google Drive
+        env:
+          RCLONE_CLIENT_ID: ${{ secrets.RCLONE_CLIENT_ID }}
+          RCLONE_CLIENT_SECRET: ${{ secrets.RCLONE_CLIENT_SECRET }}
+          RCLONE_TOKEN: ${{ secrets.RCLONE_TOKEN }}
+          GDRIVE_FOLDER_ID: ${{ secrets.GDRIVE_FOLDER_ID }}
         run: |
-          export PGPASSWORD="${{ secrets.RAILWAY_DB_PASS }}"
-          pg_dump \
-            -h ${{ secrets.RAILWAY_DB_HOST }} \
-            -p ${{ secrets.RAILWAY_DB_PORT }} \
-            -U ${{ secrets.RAILWAY_DB_USER }} \
-            -d ${{ secrets.RAILWAY_DB_NAME }} \
-            --format=plain \
+          set -euo pipefail
+          mkdir -p ~/.config/rclone
+
+          cat > ~/.config/rclone/rclone.conf <<EOF
+          [gdrive]
+          type = drive
+          scope = drive
+          client_id = ${RCLONE_CLIENT_ID}
+          client_secret = ${RCLONE_CLIENT_SECRET}
+          token = ${RCLONE_TOKEN}
+          root_folder_id = ${GDRIVE_FOLDER_ID}
+          EOF
+
+          chmod 600 ~/.config/rclone/rclone.conf
+
+      - name: Verify database and show row counts
+        env:
+          DATABASE_URL: ${{ secrets.RAILWAY_DATABASE_URL }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${DATABASE_URL:-}" ]; then
+            echo "RAILWAY_DATABASE_URL secret is missing."
+            exit 1
+          fi
+
+          psql "$DATABASE_URL" --no-password \
+            -v ON_ERROR_STOP=1 \
+            -c "SELECT current_database() AS database_name;"
+
+          psql "$DATABASE_URL" --no-password \
+            -v ON_ERROR_STOP=1 \
+            -c "
+              SELECT table_name, row_count
+              FROM (
+                SELECT 'bill'::text AS table_name, COUNT(*) AS row_count
+                  FROM public.bill
+                UNION ALL
+                SELECT 'bill_items', COUNT(*) FROM public.bill_items
+                UNION ALL
+                SELECT 'customer', COUNT(*) FROM public.customer
+                UNION ALL
+                SELECT 'products', COUNT(*) FROM public.products
+              ) AS counts
+              ORDER BY table_name;
+            "
+
+      - name: Dump the entire PostgreSQL database
+        env:
+          DATABASE_URL: ${{ secrets.RAILWAY_DATABASE_URL }}
+        run: |
+          set -euo pipefail
+
+          pg_dump "$DATABASE_URL" \
             --no-password \
-            > database_backup.sql
-          echo "✅ Database dump size: $(du -sh database_backup.sql)"
+            --format=plain \
+            --no-owner \
+            --no-privileges \
+            --file=database_backup.sql
 
-      - name: Create ZIP with date
+          test -s database_backup.sql
+          echo "Full database dump created successfully."
+          du -h database_backup.sql
+
+      - name: Create dated backup ZIP
         run: |
-          DATE=$(date +%Y-%m-%d)
-          zip -r "store_managemant_backup_${DATE}.zip" . \
-            --exclude "*.git*" \
-            --exclude "node_modules/*"
-          echo "BACKUP_FILE=store_managemant_backup_${DATE}.zip" >> $GITHUB_ENV
+          set -euo pipefail
 
-      - name: Upload to Google Drive
-        run: rclone copy "${{ env.BACKUP_FILE }}" gdrive:/
+          DATE=$(date -u +%Y-%m-%d)
+          BACKUP_FILE="store_managemant_backup_${DATE}.zip"
+
+          # Archive only the database dump, not the application repository.
+          zip -j "$BACKUP_FILE" database_backup.sql
+          unzip -t "$BACKUP_FILE"
+
+          echo "BACKUP_FILE=${BACKUP_FILE}" >> "$GITHUB_ENV"
+
+      - name: Upload backup to Google Drive
+        run: |
+          set -euo pipefail
+          rclone copy "${BACKUP_FILE}" gdrive:/
+          echo "Backup uploaded: ${BACKUP_FILE}"
 
       - name: Delete backups older than 30 days
         run: |
-          rclone ls gdrive:/ | grep "store_managemant_backup" | sort | head -n -30 | awk '{print $2}' | while read file; do
-            rclone delete "gdrive:/$file"
-            echo "Deleted: $file"
-          done
+          set -euo pipefail
+          rclone delete gdrive:/ \
+            --min-age 30d \
+            --include 'store_managemant_backup_*.zip'
 
-      - name: Show backup count
+      - name: Show remaining backup count
         run: |
-          COUNT=$(rclone ls gdrive:/ | grep "store_managemant_backup" | wc -l)
-          echo "Total backups: $COUNT"
+          COUNT=$(rclone lsf gdrive:/ --files-only \
+            --include 'store_managemant_backup_*.zip' | wc -l)
+
+          echo "Total retained backups: ${COUNT}"
